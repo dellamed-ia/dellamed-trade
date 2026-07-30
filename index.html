@@ -234,16 +234,17 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
             max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
         </div>
         <div style="position:relative"><label class="lbl" style="font-size:10px">Loja</label>
-          <button class="nav" id="ft-loja-btn" style="padding:7px 10px;font-size:13px;min-width:140px;text-align:left">Todas ▾</button>
+          <button class="nav" id="ft-loja-btn" style="padding:7px 10px;font-size:13px;min-width:160px;text-align:left">Todas ▾</button>
           <div id="ft-loja-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;margin-top:4px;
-            background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:220px;
-            max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
-        </div>
-        <div style="position:relative"><label class="lbl" style="font-size:10px">Endereco</label>
-          <button class="nav" id="ft-end-btn" style="padding:7px 10px;font-size:13px;min-width:140px;text-align:left">Todos ▾</button>
-          <div id="ft-end-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;margin-top:4px;
-            background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:260px;
-            max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+            background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:240px;
+            max-height:300px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)">
+            <div style="position:relative;margin-bottom:8px">
+              <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="ft-loja-busca" type="text" autocomplete="off" placeholder="Buscar loja..."
+                style="padding:6px 8px 6px 28px;font-size:12px">
+            </div>
+            <div id="ft-loja-lista"></div>
+          </div>
         </div>
         <button class="nav" id="ft-limpar" title="Limpar filtros" style="padding:7px 10px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -499,8 +500,7 @@ let CLIENTES = [];        // aba CLIENTES
 let PROGRAMACOES = [];    // aba PROGRAMACAO
 let PROG_EDIT = null;     // contexto do popup de programacao
 let FT_SEG = new Set();   // filtro multiplo segmento (relatorio)
-let FT_LOJA = new Set();  // filtro multiplo loja (relatorio)
-let FT_END = new Set();   // filtro multiplo endereco (relatorio)
+let FT_LOJA = new Set();  // filtro loja (relatorio, com busca)
 let charts = {};
 
 const $ = id => document.getElementById(id);
@@ -970,26 +970,54 @@ $("del-sim").onclick = async () => {
 ["ft-de","ft-ate","ft-vend","ft-uf","ft-sent"].forEach(id => $(id).onchange = renderRel);
 $("ft-limpar").onclick = () => {
   ["ft-de","ft-ate","ft-vend","ft-uf","ft-sent"].forEach(id => $(id).value = "");
-  LOJA_FILTRO = ""; FT_SEG.clear(); FT_LOJA.clear(); FT_END.clear();
+  LOJA_FILTRO = ""; FT_SEG.clear(); FT_LOJA.clear();
+  if($("ft-loja-busca")) $("ft-loja-busca").value = "";
   renderRel();
 };
 $("ft-atualizar").onclick = () => recarregar();
 
-/* multi-select dropdowns (segmento, loja, endereco) */
+/* dropdowns de filtro (segmento e loja) */
 function toggleDrop(id){
-  ["ft-seg-drop","ft-loja-drop","ft-end-drop"].forEach(d => {
+  ["ft-seg-drop","ft-loja-drop"].forEach(d => {
     if(d===id) $(d).classList.toggle("hide");
     else $(d).classList.add("hide");
   });
 }
 $("ft-seg-btn").onclick = e => { e.stopPropagation(); toggleDrop("ft-seg-drop"); };
 $("ft-loja-btn").onclick = e => { e.stopPropagation(); toggleDrop("ft-loja-drop"); };
-$("ft-end-btn").onclick = e => { e.stopPropagation(); toggleDrop("ft-end-drop"); };
 document.addEventListener("click", e => {
-  if(!e.target.closest("#ft-seg-drop,#ft-seg-btn,#ft-loja-drop,#ft-loja-btn,#ft-end-drop,#ft-end-btn")){
-    ["ft-seg-drop","ft-loja-drop","ft-end-drop"].forEach(d => $(d) && $(d).classList.add("hide"));
+  if(!e.target.closest("#ft-seg-drop,#ft-seg-btn,#ft-loja-drop,#ft-loja-btn")){
+    ["ft-seg-drop","ft-loja-drop"].forEach(d => $(d) && $(d).classList.add("hide"));
   }
 });
+// busca dentro do dropdown de loja
+$("ft-loja-busca").oninput = () => montaLojaMulti($("ft-loja-busca").value);
+
+// monta a lista de lojas (com filtro de busca) no dropdown
+let _LOJAS_REL = [];
+function montaLojaMulti(filtro){
+  const f = (filtro||"").toLowerCase().trim();
+  const alvo = f ? _LOJAS_REL.filter(l => l.toLowerCase().includes(f)) : _LOJAS_REL;
+  const cont = $("ft-loja-lista");
+  if(!alvo.length){ cont.innerHTML = `<div style="font-size:12px;color:var(--tx3);padding:6px">Nenhuma loja</div>`; }
+  else {
+    cont.innerHTML = alvo.slice(0,200).map(v => {
+      const on = FT_LOJA.has(v);
+      return `<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;cursor:pointer;font-size:12px;border-radius:4px">
+        <input type="checkbox" ${on?"checked":""} data-val="${esc(v)}" style="width:14px;height:14px;padding:0;accent-color:var(--cy)">
+        <span style="color:var(--tx2)">${esc(v)}</span></label>`;
+    }).join("");
+    cont.querySelectorAll("input").forEach(inp => {
+      inp.onchange = () => {
+        const val = inp.getAttribute("data-val");
+        if(inp.checked) FT_LOJA.add(val); else FT_LOJA.delete(val);
+        atualizaBtnMulti("ft-loja-btn", FT_LOJA, "Todas");
+        renderRel();
+      };
+    });
+  }
+  atualizaBtnMulti("ft-loja-btn", FT_LOJA, "Todas");
+}
 
 function montaMulti(dropId, btnId, valores, setRef, rotuloVazio){
   const d = $(dropId);
@@ -1051,7 +1079,6 @@ function filtrados(ignoreLoja){
     if(lj && r.loja !== lj) return false;
     if(s && classeDe(r) !== s) return false;
     if(FT_LOJA.size && !FT_LOJA.has(r.loja)) return false;
-    if(FT_END.size && !FT_END.has(r.endereco)) return false;
     if(FT_SEG.size){ const seg = segmentoDaLoja(r.loja, r.estado); if(!FT_SEG.has(seg)) return false; }
     const d = new Date(r.data);
     if(de && d < new Date(de)) return false;
@@ -1148,14 +1175,12 @@ function renderRel(){
     $(id).value = atual;
   });
 
-  // multi-selects: segmento (dos clientes visitados), loja, endereco
+  // filtros: segmento (dos clientes visitados) e loja (com busca)
   const analisados = RELATOS.filter(r=>r.analisado);
   const segsVis = [...new Set(analisados.map(r=>segmentoDaLoja(r.loja,r.estado)).filter(Boolean))].sort();
-  const lojasVis = [...new Set(analisados.map(r=>r.loja).filter(Boolean))].sort();
-  const endsVis = [...new Set(analisados.map(r=>r.endereco).filter(Boolean))].sort();
+  _LOJAS_REL = [...new Set(analisados.map(r=>r.loja).filter(Boolean))].sort();
   montaMulti("ft-seg-drop","ft-seg-btn",segsVis,FT_SEG,"Todos");
-  montaMulti("ft-loja-drop","ft-loja-btn",lojasVis,FT_LOJA,"Todas");
-  montaMulti("ft-end-drop","ft-end-btn",endsVis,FT_END,"Todos");
+  montaLojaMulti($("ft-loja-busca") ? $("ft-loja-busca").value : "");
 
   const F = filtrados();
   const cont = (arr,campo) => arr.reduce((s,r)=>s+(r[campo]?r[campo].length:0),0);
