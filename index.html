@@ -410,6 +410,10 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
       <label class="lbl">Endereço / Filial</label>
       <select id="prog-end"></select>
     </div>
+    <div id="prog-vend-wrap" style="margin-bottom:12px;display:none">
+      <label class="lbl">Vendedor responsável</label>
+      <select id="prog-vend"></select>
+    </div>
     <label class="lbl">Data programada</label>
     <input id="prog-data" type="date" style="margin-bottom:12px">
     <label class="lbl">Anotação</label>
@@ -503,6 +507,7 @@ let KPI_ABERTO = null;
 let LOJA_FILTRO = "";
 let CLIENTES = [];        // aba CLIENTES
 let PROGRAMACOES = [];    // aba PROGRAMACAO
+let VENDEDORES = [];      // usuarios (admin usa pra programar em nome de outro)
 let PROG_EDIT = null;     // contexto do popup de programacao
 let FT_SEG = new Set();   // filtro multiplo segmento (relatorio)
 let FT_LOJA = new Set();  // filtro loja (relatorio, com busca)
@@ -584,6 +589,10 @@ async function iniciar(){
     RELATOS = rr.ok ? rr.relatos : [];
     ULTIMA_CARGA = Date.now();
   }catch(e){ /* mantem o que tiver */ }
+  // admin: carrega a lista de vendedores para poder programar em nome de outro
+  if(adm){
+    try{ const rv = await api("vendedores"); if(rv.ok) VENDEDORES = rv.vendedores; }catch(e){}
+  }
   unload();
   populaFmUF();
   renderPendentes(); renderHist();
@@ -1893,6 +1902,18 @@ function abrirLojaPopup(gid){
   $("ov-mapa").classList.remove("hide");
 }
 
+// popula o seletor de vendedor no popup (so admin ve); pre-seleciona o dono atual
+function montaProgVend(donoEmail){
+  const adm = USER && USER.role==="admin";
+  $("prog-vend-wrap").style.display = adm ? "block" : "none";
+  if(!adm) return;
+  const vends = VENDEDORES.length ? VENDEDORES : [{email:USER.email, nome:USER.nome, role:USER.role}];
+  $("prog-vend").innerHTML = vends.map(v =>
+    `<option value="${esc(v.email)}">${esc(v.nome)}${v.role==="admin"?" (admin)":""}</option>`).join("");
+  const alvo = (donoEmail || USER.email || "").toLowerCase();
+  if([...$("prog-vend").options].some(o=>o.value===alvo)) $("prog-vend").value = alvo;
+}
+
 function abrirProgLoja(gid){
   const g = window._LJ_GRUPOS && window._LJ_GRUPOS[gid];
   if(!g) return;
@@ -1905,6 +1926,7 @@ function abrirProgLoja(gid){
   if(prog && prog.endereco){ $("prog-end").value = prog.endereco; }
   $("prog-data").value = prog && prog.dataProgramada ? String(prog.dataProgramada).slice(0,10) : "";
   $("prog-nota").value = prog ? prog.anotacao : "";
+  montaProgVend(prog ? prog.owner : "");
   $("ov-prog").classList.remove("hide");
 }
 function fechaProg(){ $("ov-prog").classList.add("hide"); PROG_EDIT = null; }
@@ -2021,6 +2043,7 @@ function editarProg(id){
   if(p.endereco) $("prog-end").value = p.endereco;
   $("prog-data").value = p.dataProgramada ? String(p.dataProgramada).slice(0,10) : "";
   $("prog-nota").value = p.anotacao || "";
+  montaProgVend(p.owner);
   $("ov-prog").classList.remove("hide");
 }
 
@@ -2041,11 +2064,14 @@ $("prog-salvar").onclick = async () => {
   if(!dt){ alert("Selecione a data."); return; }
   load("salvando...");
   try{
-    const r = await api("salvarProg", {
+    const adm = USER && USER.role==="admin";
+    const extra = {
       id: PROG_EDIT.editId, codCliente: PROG_EDIT.codCliente,
       loja: PROG_EDIT.loja, estado: PROG_EDIT.estado, cidade: PROG_EDIT.cidade,
       endereco: $("prog-end").value, dataProgramada: isoParaBR(dt), anotacao: $("prog-nota").value
-    });
+    };
+    if(adm && $("prog-vend").value) extra.vendedorEmail = $("prog-vend").value;
+    const r = await api("salvarProg", extra);
     unload();
     if(!r.ok){ alert(r.erro); return; }
     const lojaSalva = PROG_EDIT.loja, dataSalva = dtBR(isoParaBR(dt));
