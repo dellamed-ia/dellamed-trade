@@ -319,6 +319,10 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
         </button>
       </div>
       <div id="lj-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px"></div>
+      <div style="position:relative;margin-bottom:14px">
+        <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="lj-busca" type="text" autocomplete="off" placeholder="Pesquisar por nome da loja..." style="padding-left:38px">
+      </div>
       <div id="lj-lista"></div>
     </section>
 
@@ -335,6 +339,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
           <input type="checkbox" id="pg-soanota" style="width:15px;height:15px;padding:0;accent-color:var(--rd);cursor:pointer">
           <span style="color:var(--rd);font-weight:700">!</span> so com anotacao
         </label>
+        <button class="btn" id="pg-pesquisar" style="padding:7px 16px;font-size:12px">PESQUISAR</button>
         <button class="nav" id="pg-limpar" title="Limpar" style="padding:7px 10px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -1763,10 +1768,12 @@ function primeiroEUltimoDiaDoMes(){
 }
 
 ["lj-de","lj-ate","lj-uf","lj-cidade","lj-seg","lj-vend"].forEach(id => $(id).onchange = renderLojas);
+$("lj-busca").oninput = renderLojas;
 $("lj-limpar").onclick = () => {
   const [p,u] = primeiroEUltimoDiaDoMes();
   $("lj-de").value = p; $("lj-ate").value = u;
   ["lj-uf","lj-cidade","lj-seg","lj-vend"].forEach(id=>$(id).value="");
+  $("lj-busca").value = "";
   renderLojas();
 };
 
@@ -1813,6 +1820,9 @@ function renderLojas(){
   if(vend){
     lista = lista.filter(g => { const p = prog[g.loja+"|"+g.estado]; return p && p.vendedor===vend; });
   }
+  // busca por nome da loja
+  const busca = ($("lj-busca").value||"").toLowerCase().trim();
+  if(busca) lista = lista.filter(g => g.loja.toLowerCase().includes(busca));
 
   const totalProg = lista.filter(g => { const p=prog[g.loja+"|"+g.estado]; return p && dentroIntervalo(p); }).length;
   const adm = USER && USER.role==="admin";
@@ -1921,14 +1931,12 @@ $("lj-excel").onclick = () => {
 /* ============================================================
    PROGRAMACAO (listagem editavel)
    ============================================================ */
-["pg-de","pg-ate","pg-uf","pg-cidade","pg-seg","pg-vend","pg-soanota"].forEach(id => {
-  const ev = id==="pg-soanota" ? "onchange" : "onchange";
-  $(id)[ev] = renderProg;
-});
+["pg-uf","pg-cidade","pg-seg","pg-vend","pg-soanota"].forEach(id => { $(id).onchange = renderProg; });
+$("pg-pesquisar").onclick = renderProg;
+$("pg-de").onchange = renderProg;
+$("pg-ate").onchange = renderProg;
 $("pg-limpar").onclick = () => {
-  const [p,u]=primeiroEUltimoDiaDoMes();
-  $("pg-de").value=p; $("pg-ate").value=u;
-  ["pg-uf","pg-cidade","pg-seg","pg-vend"].forEach(id=>$(id).value="");
+  ["pg-de","pg-ate","pg-uf","pg-cidade","pg-seg","pg-vend"].forEach(id=>$(id).value="");
   $("pg-soanota").checked = false;
   renderProg();
 };
@@ -1939,7 +1947,6 @@ function segmentoDaProg(p){
 }
 
 function renderProg(){
-  if(!$("pg-de").value){ const [p,u]=primeiroEUltimoDiaDoMes(); $("pg-de").value=p; $("pg-ate").value=u; }
   const de=$("pg-de").value, ate=$("pg-ate").value;
   const uf=$("pg-uf").value, cid=$("pg-cidade").value, seg=$("pg-seg").value, vend=$("pg-vend").value;
   const soAnota = $("pg-soanota").checked;
