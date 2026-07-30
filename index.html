@@ -841,11 +841,16 @@ function podeExcluir(r){ return USER.role === "admin" || r.owner === CRED.email.
 
 function listaFiltrada(){
   const q = $("hs-busca").value.toLowerCase().trim();
-  return !q ? RELATOS : RELATOS.filter(r => (
+  const base = !q ? RELATOS : RELATOS.filter(r => (
     [r.vendedor,r.estado,r.loja,r.cidade,r.insights,r.acaoSugerida,r.textoOriginal,dtBR(r.data)]
       .concat(r.oportunidades,r.perdas,r.insights,r.produtos,r.concorrentes)
       .join(" ").toLowerCase().includes(q)
   ));
+  // mais recente para o mais antigo (usa criadoEm; se faltar, usa data)
+  return base.slice().sort((a,b)=>{
+    const da = new Date(a.criadoEm || a.data), db = new Date(b.criadoEm || b.data);
+    return db - da;
+  });
 }
 
 function renderHist(){
@@ -2018,6 +2023,7 @@ async function excluirProg(id){
   try{ const r = await api("excluirProg",{id}); unload(); if(!r.ok) alert(r.erro);
     await carregarProgramacoes(); renderProg();
     if(!$("vw-lojas").classList.contains("hide")) renderLojas();
+    if(!$("vw-dia").classList.contains("hide")) renderDia();
   }catch(e){ unload(); alert("Sem conexao."); }
 }
 
@@ -2064,13 +2070,12 @@ function renderDia(){
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const diaMs = 86400000;
   const amanha = new Date(hoje.getTime()+diaMs);
-  // fim da semana (domingo)
   const fimSemana = new Date(hoje); fimSemana.setDate(hoje.getDate() + (7 - hoje.getDay()));
   const iniProxSemana = new Date(fimSemana);
   const fimProxSemana = new Date(fimSemana.getTime()+7*diaMs);
   const fimMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0, 23,59,59);
 
-  // apenas as do proprio vendedor (o backend ja filtra; admin ve todas)
+  // admin ve a agenda de todos; vendedor ve so a propria
   const adm = USER && USER.role==="admin";
   const base = adm ? PROGRAMACOES : PROGRAMACOES.filter(p=>p.isOwn);
   const minhas = base.slice().sort((a,b)=>new Date(a.dataProgramada)-new Date(b.dataProgramada));
@@ -2095,31 +2100,34 @@ function renderDia(){
       </div>
       <div style="font-size:12px;color:var(--tx2);margin-top:3px">${esc(p.cidade)} — ${esc(p.estado)}</div>
       ${p.endereco?`<div style="font-size:11px;color:var(--tx3);margin-top:2px">📍 ${esc(p.endereco)}</div>`:""}
-      ${USER.role==="admin"?`<div style="font-size:11px;color:var(--tx3);margin-top:2px">${esc(p.vendedor)}</div>`:""}
+      ${adm?`<div style="font-size:11px;font-weight:700;color:var(--cy);margin-top:4px">👤 ${esc(p.vendedor)}</div>`:""}
       ${temNota?`<div style="margin-top:6px;font-size:12px;color:var(--tx2)"><span style="color:var(--rd);font-weight:700">!</span> ${esc(p.anotacao)}</div>`:""}
     </div>`;
   };
 
-  const coluna = (titulo, cor, arr) => `
-    <div style="flex:1;min-width:240px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid ${cor}">
-        <h4 style="margin:0;font-size:12px;letter-spacing:.06em;color:${cor}">${titulo}</h4>
+  // secoes empilhadas (uma abaixo da outra)
+  const secao = (titulo, cor, arr) => {
+    if(!arr.length) return "";
+    return `<div style="margin-bottom:22px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${cor}">
+        <h4 style="margin:0;font-size:13px;letter-spacing:.06em;color:${cor}">${titulo}</h4>
         <span style="font-size:11px;color:var(--tx3);background:var(--card2);padding:1px 8px;border-radius:10px">${arr.length}</span>
       </div>
-      ${arr.length ? arr.map(item).join("") : '<div style="font-size:12px;color:var(--tx3);padding:8px 0">Nada agendado</div>'}
+      ${arr.map(item).join("")}
     </div>`;
+  };
 
-  $("dia-conteudo").innerHTML = `
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px">
-      ${coluna("HOJE","var(--gr)",baldes.hoje)}
-      ${coluna("AMANHA","var(--cy)",baldes.amanha)}
-      ${coluna("RESTANTE DA SEMANA","var(--am)",baldes.semana)}
-    </div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap">
-      ${coluna("SEMANA QUE VEM","var(--pu)",baldes.proxSemana)}
-      ${coluna("RESTANTE DO MES","var(--mg)",baldes.mes)}
-      ${baldes.futuro.length ? coluna("DEPOIS","var(--tx3)",baldes.futuro) : ""}
-    </div>`;
+  const html = [
+    secao("HOJE","var(--gr)",baldes.hoje),
+    secao("AMANHA","var(--cy)",baldes.amanha),
+    secao("RESTANTE DA SEMANA","var(--am)",baldes.semana),
+    secao("SEMANA QUE VEM","var(--pu)",baldes.proxSemana),
+    secao("RESTANTE DO MES","var(--mg)",baldes.mes),
+    secao("DEPOIS","var(--tx3)",baldes.futuro)
+  ].join("");
+
+  $("dia-conteudo").innerHTML = html ||
+    `<div class="mono" style="text-align:center;padding:50px;color:var(--tx3);font-size:13px">// nenhuma visita programada</div>`;
 }
 
 /* ---------- SESSAO SALVA ---------- */
