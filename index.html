@@ -34,6 +34,9 @@ input,select,textarea{font-family:inherit;width:100%;padding:11px 14px;border-ra
   border:1px solid var(--bd);background:var(--card2);color:var(--tx);font-size:14px;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--cy);box-shadow:0 0 0 2px rgba(0,229,255,.15)}
 select option{background:var(--card2);color:var(--tx)}
+/* filtros nas barras: largura minima pra nao encolher enquanto carrega */
+.card select[style*="font-size:13px"], .card input[type="date"][style*="font-size:13px"]{min-width:120px}
+.card input[type="date"][style*="font-size:13px"]{min-width:140px}
 ::placeholder{color:var(--tx3)}
 input[type=date]{color-scheme:dark;min-height:38px}
 @supports (-webkit-touch-callout:none){
@@ -554,35 +557,63 @@ async function iniciar(){
   $("hd-role").style.color = adm ? "var(--am)" : "var(--tx3)";
   $("fm-vend").textContent = USER.nome;
   $("ft-excel").classList.toggle("hide", !adm);
-  await carregarClientes();
-  await carregarProgramacoes();
-  await recarregar();
+
+  // carrega tudo em paralelo (1 espera em vez de 3 sequenciais)
+  load("carregando dados...");
+  try{
+    const [rc, rp, rr] = await Promise.all([
+      api("clientes").catch(()=>({ok:false})),
+      api("listarProg").catch(()=>({ok:false})),
+      api("listar").catch(()=>({ok:false}))
+    ]);
+    CLIENTES = rc.ok ? rc.clientes : [];
+    PROGRAMACOES = rp.ok ? rp.programacoes : [];
+    RELATOS = rr.ok ? rr.relatos : [];
+    ULTIMA_CARGA = Date.now();
+  }catch(e){ /* mantem o que tiver */ }
+  unload();
+  populaFmUF();
+  renderPendentes(); renderHist();
 }
 
 async function carregarClientes(){
-  try{ const r = await api("clientes"); CLIENTES = r.ok ? r.clientes : []; }
-  catch(e){ CLIENTES = []; }
+  try{ const r = await api("clientes"); if(r.ok) CLIENTES = r.clientes; }
+  catch(e){}
   populaFmUF();
 }
 
 async function carregarProgramacoes(){
-  try{ const r = await api("listarProg"); PROGRAMACOES = r.ok ? r.programacoes : []; }
-  catch(e){ PROGRAMACOES = []; }
+  try{ const r = await api("listarProg"); if(r.ok) PROGRAMACOES = r.programacoes; }
+  catch(e){}
 }
 
+// recarrega os relatos do servidor (usado apos criar/excluir)
 async function recarregar(){
-  load("buscando relatos...");
+  load("atualizando...");
   try{
     const r = await api("listar");
-    RELATOS = r.ok ? r.relatos : [];
-    ULTIMA_CARGA = Date.now();
-  }catch(e){ RELATOS = []; }
+    if(r.ok){ RELATOS = r.relatos; ULTIMA_CARGA = Date.now(); }
+  }catch(e){}
   unload();
   renderPendentes(); renderHist();
   if(!$("vw-rel").classList.contains("hide")) renderRel();
   if(!$("vw-lojas").classList.contains("hide")) renderLojas();
   if(!$("vw-prog").classList.contains("hide")) renderProg();
   if(!$("vw-dia").classList.contains("hide")) renderDia();
+}
+
+// atualiza clientes+programacoes+relatos em paralelo, em segundo plano
+async function atualizarTudoBg(){
+  try{
+    const [rc, rp, rr] = await Promise.all([
+      api("clientes").catch(()=>({ok:false})),
+      api("listarProg").catch(()=>({ok:false})),
+      api("listar").catch(()=>({ok:false}))
+    ]);
+    if(rc.ok) CLIENTES = rc.clientes;
+    if(rp.ok) PROGRAMACOES = rp.programacoes;
+    if(rr.ok){ RELATOS = rr.relatos; ULTIMA_CARGA = Date.now(); }
+  }catch(e){}
 }
 
 /* ---------- NAVEGACAO ---------- */
@@ -597,28 +628,21 @@ function irPara(v){
     }
   });
 }
+// cada aba: desenha JA com o cache, depois atualiza em segundo plano e redesenha
 $("nv-novo").onclick = () => irPara("novo");
-$("nv-hist").onclick = () => irPara("hist");
-$("nv-rel").onclick  = () => {
-  irPara("rel");
-  if(Date.now() - ULTIMA_CARGA > 60000) recarregar();
-  else renderRel();
+$("nv-hist").onclick = () => { irPara("hist"); renderHist(); };
+$("nv-rel").onclick  = () => { irPara("rel"); renderRel(); };
+$("nv-lojas").onclick = () => {
+  irPara("lojas"); renderLojas();
+  atualizarTudoBg().then(()=>{ if(!$("vw-lojas").classList.contains("hide")) renderLojas(); });
 };
-$("nv-lojas").onclick = async () => {
-  irPara("lojas");
-  if(!CLIENTES.length) await carregarClientes();
-  await carregarProgramacoes();
-  renderLojas();
+$("nv-prog").onclick = () => {
+  irPara("prog"); renderProg();
+  atualizarTudoBg().then(()=>{ if(!$("vw-prog").classList.contains("hide")) renderProg(); });
 };
-$("nv-prog").onclick = async () => {
-  irPara("prog");
-  await carregarProgramacoes();
-  renderProg();
-};
-$("nv-dia").onclick = async () => {
-  irPara("dia");
-  await carregarProgramacoes();
-  renderDia();
+$("nv-dia").onclick = () => {
+  irPara("dia"); renderDia();
+  atualizarTudoBg().then(()=>{ if(!$("vw-dia").classList.contains("hide")) renderDia(); });
 };
 
 /* ---------- FORMULARIO ---------- */
@@ -2023,9 +2047,9 @@ function renderDia(){
   try{
     CRED = JSON.parse(s);
     load("entrando...");
-    const r = await api("listar");
+    const r = await api("login");   // login devolve o usuario
     unload();
-    if(r.ok){ USER = r.usuario; iniciar(); }
+    if(r.ok && r.usuario){ USER = r.usuario; iniciar(); }
     else { localStorage.removeItem("trade_cred"); CRED = null; }
   }catch(e){ unload(); CRED = null; }
 })();
