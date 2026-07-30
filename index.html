@@ -162,6 +162,14 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
           <label class="lbl">Data da visita</label>
           <input id="fm-data" type="date" style="max-width:200px">
         </div>
+        <div style="margin-bottom:14px">
+          <label class="lbl">Buscar por CNPJ <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(opcional — preenche estado, loja e endereço)</span></label>
+          <div style="position:relative">
+            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="fm-cnpj" type="text" inputmode="numeric" autocomplete="off" placeholder="Digite ou cole o CNPJ" style="padding-left:34px">
+          </div>
+          <div id="fm-cnpj-msg" style="font-size:11px;margin-top:5px;display:none"></div>
+        </div>
         <div style="display:grid;grid-template-columns:90px 1fr;gap:14px;margin-bottom:14px">
           <div>
             <label class="lbl">Estado</label>
@@ -733,6 +741,34 @@ function enderecoCompleto(c){
   return [c.endereco, c.numero, c.complemento, c.bairro].filter(Boolean).join(", ");
 }
 
+/* ---------- busca por CNPJ ---------- */
+function soDigitos(s){ return String(s||"").replace(/\D/g,""); }
+
+$("fm-cnpj").oninput = () => {
+  const alvo = soDigitos($("fm-cnpj").value);
+  const msg = $("fm-cnpj-msg");
+  if(alvo.length < 14){ msg.style.display = "none"; return; }
+  // acha a filial exata pelo CNPJ
+  const c = CLIENTES.find(x => soDigitos(x.cnpj) === alvo);
+  if(!c){
+    msg.style.display = "block";
+    msg.style.color = "var(--rd)";
+    msg.textContent = "CNPJ nao encontrado na base de clientes.";
+    return;
+  }
+  // preenche a cascata: estado -> loja -> endereco
+  $("fm-uf").value = c.estado;
+  $("fm-loja-busca").disabled = false;
+  selecionaLoja(c.loja);   // monta os enderecos da loja
+  // seleciona a filial exata deste CNPJ
+  const filiais = CLIENTES.filter(x => x.estado===c.estado && x.loja===c.loja);
+  const idx = filiais.findIndex(x => soDigitos(x.cnpj) === alvo);
+  if(idx >= 0){ $("fm-end").value = String(idx); $("fm-end").onchange(); }
+  msg.style.display = "block";
+  msg.style.color = "var(--gr)";
+  msg.textContent = "✓ " + c.loja + " — " + c.cidade + "/" + c.estado;
+};
+
 // preenche com a data de hoje ao abrir
 (function(){
   const h = new Date();
@@ -767,7 +803,8 @@ $("fm-enviar").onclick = async () => {
     unload();
     if(!r.ok){ alert(r.erro || "Falha ao enviar."); return; }
     $("fm-texto").value = "";
-    $("fm-loja").value = ""; $("fm-end-wrap").style.display = "none"; $("fm-end-info").style.display = "none";
+    $("fm-loja").value = ""; $("fm-loja-busca").value = ""; $("fm-end-wrap").style.display = "none"; $("fm-end-info").style.display = "none";
+    $("fm-cnpj").value = ""; $("fm-cnpj-msg").style.display = "none";
     $("ov-ok").classList.remove("hide");
     await recarregar();
   }catch(e){ unload(); alert("Sem conexao. O relato nao foi enviado, tente de novo."); }
