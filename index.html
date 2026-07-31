@@ -414,10 +414,17 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
       <label class="lbl">Vendedor responsável</label>
       <select id="prog-vend"></select>
     </div>
-    <label class="lbl">Data programada</label>
-    <input id="prog-data" type="date" style="margin-bottom:12px">
-    <label class="lbl">Anotação</label>
-    <textarea id="prog-nota" rows="3" style="resize:vertical;margin-bottom:14px" placeholder="Observações da visita..."></textarea>
+    <label class="lbl" style="margin:0 0 6px">Selecione no calendário <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(toque e arraste para vários dias)</span></label>
+    <div id="prog-cal" style="margin-bottom:12px;border:1px solid var(--bd);border-radius:10px;padding:10px;background:var(--card2);user-select:none;-webkit-user-select:none;touch-action:none"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <label class="lbl" style="margin:0">Datas selecionadas</label>
+      <div style="display:flex;gap:6px">
+        <button class="nav" id="prog-limpar-datas" style="font-size:11px;padding:4px 12px;color:var(--rd)">limpar tudo</button>
+        <button class="nav" id="prog-add-data" style="font-size:11px;padding:4px 12px;border-color:rgba(0,229,255,.4);color:var(--cy)">+ data manual</button>
+      </div>
+    </div>
+    <div id="prog-datas"></div>
+    <div id="prog-limite" style="font-size:11px;color:var(--tx3);margin:2px 0 14px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="nav" onclick="fechaProg()">CANCELAR</button>
       <button class="btn" id="prog-salvar" style="padding:10px 28px">SALVAR</button>
@@ -1758,9 +1765,20 @@ function lojasVisitadasSet(){
   return new Set(RELATOS.filter(r=>r.analisado && r.loja).map(r=>r.loja+"|"+r.estado));
 }
 function progIndex(){
-  // mapa loja|estado -> programacao (a mais recente)
+  // mapa loja|estado -> { lista:[progs], prox: prog mais proxima, total:n }
   const m = {};
-  PROGRAMACOES.forEach(p => { m[p.loja+"|"+p.estado] = p; });
+  PROGRAMACOES.forEach(p => {
+    const k = p.loja+"|"+p.estado;
+    if(!m[k]) m[k] = { lista:[], prox:null, total:0 };
+    m[k].lista.push(p);
+    m[k].total++;
+  });
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  Object.values(m).forEach(o => {
+    // proxima visita futura; se nao houver, a mais recente
+    const ord = o.lista.slice().sort((a,b)=>new Date(a.dataProgramada)-new Date(b.dataProgramada));
+    o.prox = ord.find(p => new Date(p.dataProgramada) >= hoje) || ord[ord.length-1];
+  });
   return m;
 }
 function preencheSelect(id, valores, rotuloTodos){
@@ -1827,13 +1845,16 @@ function renderLojas(){
     return true;
   };
   if(vend){
-    lista = lista.filter(g => { const p = prog[g.loja+"|"+g.estado]; return p && p.vendedor===vend; });
+    lista = lista.filter(g => { const o = prog[g.loja+"|"+g.estado]; return o && o.lista.some(p=>p.vendedor===vend); });
   }
   // busca por nome da loja
   const busca = ($("lj-busca").value||"").toLowerCase().trim();
   if(busca) lista = lista.filter(g => g.loja.toLowerCase().includes(busca));
 
-  const totalProg = lista.filter(g => { const p=prog[g.loja+"|"+g.estado]; return p && dentroIntervalo(p); }).length;
+  const totalProg = lista.filter(g => {
+    const o = prog[g.loja+"|"+g.estado];
+    return o && o.lista.some(p=>dentroIntervalo(p));
+  }).length;
   const adm = USER && USER.role==="admin";
 
   $("lj-kpis").innerHTML = `
@@ -1848,28 +1869,35 @@ function renderLojas(){
 
   lista.sort((a,b)=>a.loja.localeCompare(b.loja));
   $("lj-lista").innerHTML = lista.length ? lista.map(g => {
-    const p = prog[g.loja+"|"+g.estado];
-    const temProg = p && dentroIntervalo(p);
+    const o = prog[g.loja+"|"+g.estado];
+    const p = o ? o.prox : null;
+    const temProg = o && o.lista.some(x=>dentroIntervalo(x));
     const gid = (g.loja+"|"+g.estado).replace(/[^a-zA-Z0-9]/g,"_");
-    const daOutro = temProg && p.isOwn === false;   // programado por outro vendedor
+    const daOutro = temProg && p && p.isOwn === false;   // programado por outro vendedor
     const corBorda = temProg ? (daOutro ? "var(--pu)" : "var(--am)") : "var(--bd)";
+    const qtd = o ? o.total : 0;
     let botao;
     if(!temProg){
       botao = `<button class="nav" style="font-size:10px;padding:6px 11px;border-color:rgba(255,187,0,.5);color:var(--am);flex-shrink:0"
         onclick="abrirProgLoja('${gid}')" title="Programar visita">📅 PREVISAO</button>`;
     } else if(daOutro){
-      botao = `<span style="font-size:9px;font-weight:700;padding:6px 10px;border-radius:6px;border:1px solid rgba(139,92,246,.4);
-        color:var(--pu);flex-shrink:0;white-space:nowrap;letter-spacing:.03em">PROGRAMADO POR OUTRO USUARIO</span>`;
+      botao = `<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
+        <span style="font-size:9px;font-weight:700;padding:6px 10px;border-radius:6px;border:1px solid rgba(139,92,246,.4);
+          color:var(--pu);white-space:nowrap;letter-spacing:.03em">PROGRAMADO POR OUTRO USUARIO</span>
+        <button class="nav" style="font-size:10px;padding:4px 10px;border-color:rgba(255,187,0,.5);color:var(--am)"
+          onclick="abrirProgLoja('${gid}')" title="Adicionar visita">+ visita</button></div>`;
     } else {
       botao = `<button class="nav" style="font-size:10px;padding:6px 11px;border-color:rgba(255,187,0,.5);color:var(--am);flex-shrink:0"
-        onclick="abrirProgLoja('${gid}')" title="Editar programacao">📅 EDITAR</button>`;
+        onclick="abrirProgLoja('${gid}')" title="Adicionar visita">📅 + VISITA</button>`;
     }
     return `<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;
       justify-content:space-between;align-items:center;gap:10px;border-left:3px solid ${corBorda}">
       <div style="flex:1;min-width:0;cursor:pointer" onclick="abrirLojaPopup('${gid}')">
-        <div style="font-size:14px;font-weight:700">${esc(g.loja)}</div>
+        <div style="font-size:14px;font-weight:700">${esc(g.loja)}
+          ${qtd>1?`<span style="font-size:10px;color:var(--am);background:rgba(255,187,0,.12);padding:1px 7px;border-radius:4px;margin-left:6px">${qtd} visitas</span>`:""}</div>
         <div style="font-size:12px;color:var(--tx2);margin-top:2px">${esc(g.cidade)} — ${esc(g.estado)}</div>
-        ${temProg?`<div style="margin-top:5px;font-size:11px;color:${daOutro?'var(--pu)':'var(--am)'}">📅 ${dtBR(p.dataProgramada)} · ${esc(p.vendedor)}
+        ${temProg&&p?`<div style="margin-top:5px;font-size:11px;color:${daOutro?'var(--pu)':'var(--am)'}">📅 ${dtBR(p.dataProgramada)} · ${esc(p.vendedor)}
+          ${qtd>1?` · +${qtd-1}`:""}
           ${p.anotacao?`<span style="color:var(--rd);font-weight:700;margin-left:4px">!</span>`:""}</div>`:""}
       </div>
       ${botao}
@@ -1914,19 +1942,183 @@ function montaProgVend(donoEmail){
   if([...$("prog-vend").options].some(o=>o.value===alvo)) $("prog-vend").value = alvo;
 }
 
+/* ---------- datas: calendario com arrastar + lista manual (ate 31) ---------- */
+const PROG_MAX_DATAS = 31;
+let PROG_CAL_MES = new Date();      // mes exibido no calendario
+let PROG_ARRASTA = null;           // {inicio: 'YYYY-MM-DD'} durante o arrasto
+
+function isoDe(y,m,d){ return y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"); }
+
+// conjunto de datas ja selecionadas (lidas das linhas)
+function datasSelecionadas(){
+  const s = new Set();
+  $("prog-datas").querySelectorAll(".prog-data-row").forEach(r => {
+    const d = r.querySelector(".pd-data").value; if(d) s.add(d);
+  });
+  return s;
+}
+
+function addDataRow(dataISO, nota){
+  const cont = $("prog-datas");
+  if(cont.children.length >= PROG_MAX_DATAS) return;
+  const row = document.createElement("div");
+  row.className = "prog-data-row";
+  row.style.cssText = "display:flex;gap:8px;align-items:flex-start;margin-bottom:8px";
+  row.innerHTML = `
+    <input type="date" class="pd-data" value="${dataISO||""}" style="flex:0 0 148px;padding:8px 10px;font-size:13px">
+    <input type="text" class="pd-nota" value="${nota?esc(nota):""}" placeholder="anotação (opcional)" style="flex:1;min-width:0;padding:8px 10px;font-size:13px">
+    <button class="nav pd-del" title="Remover" style="flex:0 0 auto;padding:8px 10px;color:var(--rd)">✕</button>`;
+  row.querySelector(".pd-del").onclick = () => { row.remove(); atualizaLimiteDatas(); renderCal(); };
+  row.querySelector(".pd-data").onchange = () => renderCal();
+  cont.appendChild(row);
+  atualizaLimiteDatas();
+}
+function toggleData(iso){
+  const sel = datasSelecionadas();
+  if(sel.has(iso)){
+    // remove a linha daquela data
+    $("prog-datas").querySelectorAll(".prog-data-row").forEach(r => {
+      if(r.querySelector(".pd-data").value === iso) r.remove();
+    });
+  } else {
+    if(datasSelecionadas().size >= PROG_MAX_DATAS) return;
+    addDataRow(iso, "");
+  }
+  atualizaLimiteDatas();
+  renderCal();
+}
+function addIntervalo(isoA, isoB){
+  let a = new Date(isoA+"T00:00:00"), b = new Date(isoB+"T00:00:00");
+  if(a>b){ const t=a; a=b; b=t; }
+  const sel = datasSelecionadas();
+  for(let d=new Date(a); d<=b; d.setDate(d.getDate()+1)){
+    const iso = isoDe(d.getFullYear(), d.getMonth(), d.getDate());
+    if(!sel.has(iso) && datasSelecionadas().size < PROG_MAX_DATAS){ addDataRow(iso,""); sel.add(iso); }
+  }
+  atualizaLimiteDatas();
+  renderCal();
+}
+function atualizaLimiteDatas(){
+  const n = $("prog-datas").children.length;
+  $("prog-limite").textContent = n + " de " + PROG_MAX_DATAS + " datas" + (n>=PROG_MAX_DATAS ? " (limite atingido)" : "");
+  $("prog-add-data").style.display = n >= PROG_MAX_DATAS ? "none" : "";
+}
+function lerDatas(){
+  const out = [];
+  $("prog-datas").querySelectorAll(".prog-data-row").forEach(r => {
+    const d = r.querySelector(".pd-data").value;
+    const n = r.querySelector(".pd-nota").value;
+    if(d) out.push({ data:d, nota:n });
+  });
+  return out;
+}
+$("prog-add-data").onclick = () => addDataRow("", "");
+$("prog-limpar-datas").onclick = () => {
+  $("prog-datas").innerHTML = "";
+  atualizaLimiteDatas();
+  renderCal();
+};
+
+/* ----- calendario ----- */
+const MESNOME = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const DIASEM = ["D","S","T","Q","Q","S","S"];
+
+function renderCal(){
+  const cal = $("prog-cal");
+  const y = PROG_CAL_MES.getFullYear(), m = PROG_CAL_MES.getMonth();
+  const sel = datasSelecionadas();
+  const primeiro = new Date(y, m, 1).getDay();      // 0=dom
+  const totalDias = new Date(y, m+1, 0).getDate();
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <button class="nav" id="cal-prev" style="padding:4px 10px;font-size:13px">‹</button>
+    <b style="font-size:13px">${MESNOME[m]} ${y}</b>
+    <button class="nav" id="cal-next" style="padding:4px 10px;font-size:13px">›</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">`;
+  DIASEM.forEach(d => html += `<div style="text-align:center;font-size:10px;color:var(--tx3);padding:2px 0">${d}</div>`);
+  for(let i=0;i<primeiro;i++) html += `<div></div>`;
+  for(let dia=1; dia<=totalDias; dia++){
+    const iso = isoDe(y,m,dia);
+    const on = sel.has(iso);
+    html += `<div class="cal-dia" data-iso="${iso}" style="text-align:center;padding:9px 0;border-radius:7px;cursor:pointer;
+      font-size:13px;font-weight:${on?"700":"500"};
+      background:${on?"var(--cy)":"transparent"};color:${on?"#00131a":"var(--tx2)"};
+      border:1px solid ${on?"var(--cy)":"var(--bd)"}">${dia}</div>`;
+  }
+  html += `</div>
+  <div style="font-size:10px;color:var(--tx3);margin-top:8px;text-align:center">toque num dia ou arraste para marcar vários seguidos</div>`;
+  cal.innerHTML = html;
+
+  $("cal-prev").onclick = () => { PROG_CAL_MES = new Date(y, m-1, 1); renderCal(); };
+  $("cal-next").onclick = () => { PROG_CAL_MES = new Date(y, m+1, 1); renderCal(); };
+
+  // arrastar para selecionar intervalo (mouse + toque), sem pointer capture
+  const dias = cal.querySelectorAll(".cal-dia");
+  const isoNoPonto = (x,y) => {
+    const el = document.elementFromPoint(x,y);
+    return el && el.classList && el.classList.contains("cal-dia") ? el.getAttribute("data-iso") : null;
+  };
+  const pintaPrevia = (fimIso) => {
+    let da=new Date(PROG_ARRASTA.inicio+"T00:00:00"), db=new Date(fimIso+"T00:00:00");
+    if(da>db){ const t=da; da=db; db=t; }
+    const sel = datasSelecionadas();
+    dias.forEach(d2 => {
+      const iso2 = d2.getAttribute("data-iso");
+      const dd = new Date(iso2+"T00:00:00");
+      const on = sel.has(iso2);
+      const dentro = dd>=da && dd<=db;
+      if(on){ d2.style.background="var(--cy)"; d2.style.borderColor="var(--cy)"; d2.style.color="#00131a"; }
+      else if(dentro){ d2.style.background="rgba(0,229,255,.30)"; d2.style.borderColor="var(--cy)"; d2.style.color="var(--tx)"; }
+      else { d2.style.background="transparent"; d2.style.borderColor="var(--bd)"; d2.style.color="var(--tx2)"; }
+    });
+  };
+
+  dias.forEach(el => {
+    el.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      PROG_ARRASTA = { inicio: el.getAttribute("data-iso"), moveu:false };
+      pintaPrevia(PROG_ARRASTA.inicio);
+    });
+  });
+
+  // move o dedo/mouse sobre o calendario: atualiza a previa do intervalo
+  cal.addEventListener("pointermove", e => {
+    if(!PROG_ARRASTA) return;
+    const iso = isoNoPonto(e.clientX, e.clientY);
+    if(!iso) return;
+    if(iso !== PROG_ARRASTA.inicio) PROG_ARRASTA.moveu = true;
+    pintaPrevia(iso);
+  });
+}
+
+// finaliza o arrasto em qualquer lugar da tela
+document.addEventListener("pointerup", e => {
+  if(!PROG_ARRASTA) return;
+  const alvo = document.elementFromPoint(e.clientX, e.clientY);
+  const fim = alvo && alvo.classList && alvo.classList.contains("cal-dia")
+    ? alvo.getAttribute("data-iso") : PROG_ARRASTA.inicio;
+  if(PROG_ARRASTA.moveu && fim && fim !== PROG_ARRASTA.inicio){
+    addIntervalo(PROG_ARRASTA.inicio, fim);
+  } else {
+    toggleData(PROG_ARRASTA.inicio);   // clique simples = liga/desliga o dia
+  }
+  PROG_ARRASTA = null;
+});
+
 function abrirProgLoja(gid){
   const g = window._LJ_GRUPOS && window._LJ_GRUPOS[gid];
   if(!g) return;
-  const prog = progIndex()[g.loja+"|"+g.estado];
-  PROG_EDIT = { codCliente:g.cod, loja:g.loja, estado:g.estado, cidade:g.cidade, editId: prog?prog.id:"" };
-  $("prog-titulo").textContent = prog ? "EDITAR PROGRAMACAO" : "PROGRAMAR VISITA";
+  // sempre cria novas visitas (uma loja pode ter varias no mes)
+  PROG_EDIT = { codCliente:g.cod, loja:g.loja, estado:g.estado, cidade:g.cidade, editId:"" };
+  $("prog-titulo").textContent = "PROGRAMAR VISITA(S)";
   $("prog-loja-info").innerHTML = `<b>${esc(g.loja)}</b><br>${esc(g.cidade)} — ${esc(g.estado)}`;
-  // enderecos (filiais)
   $("prog-end").innerHTML = g.filiais.map((c,i)=>`<option value="${esc(enderecoCompleto(c))}">${esc(enderecoCompleto(c))}</option>`).join("");
-  if(prog && prog.endereco){ $("prog-end").value = prog.endereco; }
-  $("prog-data").value = prog && prog.dataProgramada ? String(prog.dataProgramada).slice(0,10) : "";
-  $("prog-nota").value = prog ? prog.anotacao : "";
-  montaProgVend(prog ? prog.owner : "");
+  $("prog-datas").innerHTML = "";
+  PROG_CAL_MES = new Date();       // mes atual
+  atualizaLimiteDatas();
+  renderCal();
+  montaProgVend("");
   $("ov-prog").classList.remove("hide");
 }
 function fechaProg(){ $("ov-prog").classList.add("hide"); PROG_EDIT = null; }
@@ -2032,7 +2224,6 @@ function renderProg(){
 
 function editarProg(id){
   const p = PROGRAMACOES.find(x=>x.id===id); if(!p) return;
-  // reaproveita o popup, montando enderecos a partir de CLIENTES quando houver
   const filiais = CLIENTES.filter(c=>c.loja===p.loja && c.estado===p.estado);
   PROG_EDIT = { codCliente:p.codCliente, loja:p.loja, estado:p.estado, cidade:p.cidade, editId:p.id };
   $("prog-titulo").textContent = "EDITAR PROGRAMACAO";
@@ -2041,8 +2232,12 @@ function editarProg(id){
   if(p.endereco && ends.indexOf(p.endereco)===-1) ends.unshift(p.endereco);
   $("prog-end").innerHTML = ends.map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join("") || `<option value="">(sem endereço)</option>`;
   if(p.endereco) $("prog-end").value = p.endereco;
-  $("prog-data").value = p.dataProgramada ? String(p.dataProgramada).slice(0,10) : "";
-  $("prog-nota").value = p.anotacao || "";
+  $("prog-datas").innerHTML = "";
+  const isoEdit = p.dataProgramada ? String(p.dataProgramada).slice(0,10) : "";
+  addDataRow(isoEdit, p.anotacao || "");
+  PROG_CAL_MES = isoEdit ? new Date(isoEdit+"T00:00:00") : new Date();
+  atualizaLimiteDatas();
+  renderCal();
   montaProgVend(p.owner);
   $("ov-prog").classList.remove("hide");
 }
@@ -2057,30 +2252,43 @@ async function excluirProg(id){
   }catch(e){ unload(); alert("Sem conexao."); }
 }
 
-// salvar programacao (usado pelos popups de Lojas e Programacao)
+// salvar programacao(oes) — uma ou varias datas de uma vez (ate 10)
 $("prog-salvar").onclick = async () => {
   if(!PROG_EDIT) return;
-  const dt = $("prog-data").value;
-  if(!dt){ alert("Selecione a data."); return; }
-  load("salvando...");
+  const datas = lerDatas();
+  if(!datas.length){ alert("Adicione ao menos uma data."); return; }
+
+  const adm = USER && USER.role==="admin";
+  const vendedorEmail = (adm && $("prog-vend").value) ? $("prog-vend").value : null;
+  const endereco = $("prog-end").value;
+  const base = {
+    codCliente: PROG_EDIT.codCliente, loja: PROG_EDIT.loja,
+    estado: PROG_EDIT.estado, cidade: PROG_EDIT.cidade, endereco
+  };
+
+  load(datas.length>1 ? `salvando ${datas.length} visitas...` : "salvando...");
   try{
-    const adm = USER && USER.role==="admin";
-    const extra = {
-      id: PROG_EDIT.editId, codCliente: PROG_EDIT.codCliente,
-      loja: PROG_EDIT.loja, estado: PROG_EDIT.estado, cidade: PROG_EDIT.cidade,
-      endereco: $("prog-end").value, dataProgramada: isoParaBR(dt), anotacao: $("prog-nota").value
-    };
-    if(adm && $("prog-vend").value) extra.vendedorEmail = $("prog-vend").value;
-    const r = await api("salvarProg", extra);
+    let okCount = 0, erro = "";
+    for(let i=0; i<datas.length; i++){
+      const d = datas[i];
+      // na edicao, a primeira data atualiza o registro existente; as demais sao novas
+      const editId = (i===0) ? (PROG_EDIT.editId || "") : "";
+      const extra = Object.assign({}, base, {
+        id: editId, dataProgramada: isoParaBR(d.data), anotacao: d.nota
+      });
+      if(vendedorEmail) extra.vendedorEmail = vendedorEmail;
+      const r = await api("salvarProg", extra);
+      if(r.ok) okCount++; else erro = r.erro || "falha";
+    }
     unload();
-    if(!r.ok){ alert(r.erro); return; }
-    const lojaSalva = PROG_EDIT.loja, dataSalva = dtBR(isoParaBR(dt));
+    if(!okCount){ alert(erro || "Nao foi possivel salvar."); return; }
+    const lojaSalva = PROG_EDIT.loja;
     fechaProg();
     await carregarProgramacoes();
     if(!$("vw-lojas").classList.contains("hide")) renderLojas();
     if(!$("vw-prog").classList.contains("hide")) renderProg();
     if(!$("vw-dia").classList.contains("hide")) renderDia();
-    $("progok-txt").innerHTML = `<b>${esc(lojaSalva)}</b><br>Visita programada para ${dataSalva}`;
+    $("progok-txt").innerHTML = `<b>${esc(lojaSalva)}</b><br>${okCount} visita${okCount>1?"s":""} programada${okCount>1?"s":""}`;
     $("ov-progok").classList.remove("hide");
   }catch(e){ unload(); alert("Sem conexao."); }
 };
