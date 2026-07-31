@@ -418,10 +418,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
     <div id="prog-cal" style="margin-bottom:12px;border:1px solid var(--bd);border-radius:10px;padding:10px;background:var(--card2);user-select:none;-webkit-user-select:none;touch-action:none"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <label class="lbl" style="margin:0">Datas selecionadas</label>
-      <div style="display:flex;gap:6px">
-        <button class="nav" id="prog-limpar-datas" style="font-size:11px;padding:4px 12px;color:var(--rd)">limpar tudo</button>
-        <button class="nav" id="prog-add-data" style="font-size:11px;padding:4px 12px;border-color:rgba(0,229,255,.4);color:var(--cy)">+ data manual</button>
-      </div>
+      <button class="nav" id="prog-limpar-datas" style="font-size:11px;padding:4px 12px;color:var(--rd)">limpar tudo</button>
     </div>
     <div id="prog-datas"></div>
     <div id="prog-limite" style="font-size:11px;color:var(--tx3);margin:2px 0 14px"></div>
@@ -2001,7 +1998,6 @@ function addIntervalo(isoA, isoB){
 function atualizaLimiteDatas(){
   const n = $("prog-datas").children.length;
   $("prog-limite").textContent = n + " de " + PROG_MAX_DATAS + " datas" + (n>=PROG_MAX_DATAS ? " (limite atingido)" : "");
-  $("prog-add-data").style.display = n >= PROG_MAX_DATAS ? "none" : "";
 }
 function lerDatas(){
   const out = [];
@@ -2012,7 +2008,6 @@ function lerDatas(){
   });
   return out;
 }
-$("prog-add-data").onclick = () => addDataRow("", "");
 $("prog-limpar-datas").onclick = () => {
   $("prog-datas").innerHTML = "";
   atualizaLimiteDatas();
