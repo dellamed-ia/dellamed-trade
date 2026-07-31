@@ -1813,7 +1813,11 @@ function renderLojas(){
   const baseCid = uf ? CLIENTES.filter(c=>c.estado===uf) : CLIENTES;
   preencheSelect("lj-cidade", [...new Set(baseCid.map(c=>c.cidade).filter(Boolean))].sort(), "Todas");
   preencheSelect("lj-seg", [...new Set(CLIENTES.map(c=>c.segmento).filter(Boolean))].sort(), "Todos");
-  preencheSelect("lj-vend", [...new Set(PROGRAMACOES.map(p=>p.vendedor).filter(Boolean))].sort(), "Todos");
+  // filtro de vendedor: usa a lista completa de vendedores; se nao houver, cai pros que ja programaram
+  const nomesVend = VENDEDORES.length
+    ? VENDEDORES.filter(v=>v.role==="vendedor").map(v=>v.nome)
+    : [...new Set(PROGRAMACOES.map(p=>p.vendedor).filter(Boolean))];
+  preencheSelect("lj-vend", nomesVend.sort(), "Todos");
 
   const visit = lojasVisitadasSet();
   const prog = progIndex();
@@ -2168,7 +2172,10 @@ function renderProg(){
   const baseCid = uf ? universo.filter(p=>p.estado===uf) : universo;
   preencheSelect("pg-cidade", [...new Set(baseCid.map(p=>p.cidade).filter(Boolean))].sort(), "Todas");
   preencheSelect("pg-seg", [...new Set(universo.map(p=>segmentoDaProg(p)).filter(Boolean))].sort(), "Todos");
-  preencheSelect("pg-vend", [...new Set(universo.map(p=>p.vendedor).filter(Boolean))].sort(), "Todos");
+  const nomesVendPg = VENDEDORES.length
+    ? VENDEDORES.filter(v=>v.role==="vendedor").map(v=>v.nome)
+    : [...new Set(universo.map(p=>p.vendedor).filter(Boolean))];
+  preencheSelect("pg-vend", nomesVendPg.sort(), "Todos");
 
   let lista = universo.filter(p => {
     const d = new Date(p.dataProgramada);
@@ -2263,28 +2270,32 @@ $("prog-salvar").onclick = async () => {
 
   load(datas.length>1 ? `salvando ${datas.length} visitas...` : "salvando...");
   try{
-    let okCount = 0, erro = "";
-    for(let i=0; i<datas.length; i++){
-      const d = datas[i];
-      // na edicao, a primeira data atualiza o registro existente; as demais sao novas
+    // salva todas as datas em paralelo (1 espera em vez de N sequenciais)
+    const chamadas = datas.map((d, i) => {
       const editId = (i===0) ? (PROG_EDIT.editId || "") : "";
       const extra = Object.assign({}, base, {
         id: editId, dataProgramada: isoParaBR(d.data), anotacao: d.nota
       });
       if(vendedorEmail) extra.vendedorEmail = vendedorEmail;
-      const r = await api("salvarProg", extra);
-      if(r.ok) okCount++; else erro = r.erro || "falha";
-    }
+      return api("salvarProg", extra).catch(()=>({ok:false}));
+    });
+    const res = await Promise.all(chamadas);
+    const okCount = res.filter(r=>r && r.ok).length;
     unload();
-    if(!okCount){ alert(erro || "Nao foi possivel salvar."); return; }
+    if(!okCount){ alert("Nao foi possivel salvar. Tente de novo."); return; }
+
+    // mostra o PROGRAMADO na hora
     const lojaSalva = PROG_EDIT.loja;
     fechaProg();
-    await carregarProgramacoes();
-    if(!$("vw-lojas").classList.contains("hide")) renderLojas();
-    if(!$("vw-prog").classList.contains("hide")) renderProg();
-    if(!$("vw-dia").classList.contains("hide")) renderDia();
     $("progok-txt").innerHTML = `<b>${esc(lojaSalva)}</b><br>${okCount} visita${okCount>1?"s":""} programada${okCount>1?"s":""}`;
     $("ov-progok").classList.remove("hide");
+
+    // atualiza as listas em segundo plano (nao trava o feedback)
+    carregarProgramacoes().then(()=>{
+      if(!$("vw-lojas").classList.contains("hide")) renderLojas();
+      if(!$("vw-prog").classList.contains("hide")) renderProg();
+      if(!$("vw-dia").classList.contains("hide")) renderDia();
+    });
   }catch(e){ unload(); alert("Sem conexao."); }
 };
 
