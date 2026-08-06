@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="Trade Dellamed">
 <title>Trade Intelligence · Dellamed</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="//cdnjs.cloudflare.com">
 
 <style>
 :root{
@@ -519,16 +519,222 @@ let charts = {};
 
 const $ = id => document.getElementById(id);
 
+/* ---------- DESEMPENHO / CARREGAMENTO SOB DEMANDA ---------- */
+const LIB_URL = {
+  chart:"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js",
+  xlsx:"https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+};
+const _LIB_PROMISE = {};
+function carregarScript(nome, url, globalName){
+  if(window[globalName]) return Promise.resolve(window[globalName]);
+  if(_LIB_PROMISE[nome]) return _LIB_PROMISE[nome];
+  _LIB_PROMISE[nome] = new Promise((resolve,reject)=>{
+    const sc = document.createElement("script");
+    sc.src = url; sc.async = true; sc.crossOrigin = "anonymous";
+    sc.onload = () => window[globalName] ? resolve(window[globalName]) : reject(new Error(nome+" nao iniciou"));
+    sc.onerror = () => reject(new Error("Falha ao carregar "+nome));
+    document.head.appendChild(sc);
+  }).catch(err=>{ delete _LIB_PROMISE[nome]; throw err; });
+  return _LIB_PROMISE[nome];
+}
+const garantirGraficos = () => carregarScript("Chart.js", LIB_URL.chart, "Chart");
+const garantirExcel = () => carregarScript("XLSX", LIB_URL.xlsx, "XLSX");
+const debounce = (fn, espera=140) => { let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args),espera); }; };
+
+/* ---------- normalizacao dos filtros ----------
+   Regra geral: remove duplicatas ignorando apenas maiusculas/minusculas.
+   Espacos e acentos continuam significativos: "Loja A" e "Loja  A" permanecem separados.
+
+   Excecao — representante: ignora maiusculas/minusculas, acentos, espacos,
+   pontuacao e outros separadores. A primeira grafia recebida e mantida para exibicao. */
+function textoOriginal(v){ return String(v == null ? "" : v); }
+function textoLimpo(v){ return textoOriginal(v).trim(); }
+function chaveFiltro(v){
+  const original = textoOriginal(v);
+  if(!original.trim()) return "";
+  return original.normalize("NFC").toLocaleLowerCase("pt-BR");
+}
+function chaveRepresentante(v){
+  const original = textoOriginal(v).trim();
+  if(!original) return "";
+  return original
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]/g, "");
+}
+function chavePorTipo(v, tipo){
+  if(tipo === "representante") return chaveRepresentante(v);
+  if(tipo === "estado") return estadoLimpo(v).toLocaleLowerCase("pt-BR");
+  return chaveFiltro(v);
+}
+function estadoLimpo(v){ return textoLimpo(v).toUpperCase(); }
+function mesmoFiltro(a,b){ return chaveFiltro(a) === chaveFiltro(b); }
+function mesmoRepresentante(a,b){ return chaveRepresentante(a) === chaveRepresentante(b); }
+function conjuntoTemFiltro(conjunto, valor){
+  const alvo = chaveFiltro(valor);
+  if(!alvo) return false;
+  for(const item of conjunto || []) if(chaveFiltro(item) === alvo) return true;
+  return false;
+}
+function conjuntoAdicionarFiltro(conjunto, valor){
+  conjuntoRemoverFiltro(conjunto, valor);
+  conjunto.add(valor);
+}
+function conjuntoRemoverFiltro(conjunto, valor){
+  const alvo = chaveFiltro(valor);
+  [...(conjunto || [])].forEach(item=>{ if(chaveFiltro(item) === alvo) conjunto.delete(item); });
+}
+function tamanhoConjuntoFiltro(conjunto){
+  return new Set([...(conjunto || [])].map(chaveFiltro).filter(Boolean)).size;
+}
+function valoresUnicos(valores, tipo){
+  const mapa = new Map();
+  (valores || []).forEach(v => {
+    const exibido = tipo === "estado" ? estadoLimpo(v) : textoOriginal(v);
+    if(!exibido.trim()) return;
+    const chave = chavePorTipo(exibido, tipo);
+    if(chave && !mapa.has(chave)) mapa.set(chave, exibido);
+  });
+  return [...mapa.values()].sort((a,b)=>a.localeCompare(b,"pt-BR",{sensitivity:"accent"}));
+}
+function contarUnicos(valores, tipo){ return valoresUnicos(valores, tipo).length; }
+function chaveComposta(...valores){ return valores.map(v=>chaveFiltro(v)).join("¦"); }
+function chaveCliente(c){
+  const cnpj = soDigitos(c && c.cnpj);
+  if(cnpj) return "cnpj:"+cnpj;
+  return [
+    chaveFiltro(c&&c.cod), chaveFiltro(c&&c.loja), chaveFiltro(c&&c.estado), chaveFiltro(c&&c.cidade),
+    chaveFiltro(c&&c.endereco), chaveFiltro(c&&c.numero), chaveFiltro(c&&c.complemento), chaveFiltro(c&&c.bairro),
+    chaveRepresentante(c&&c.representante), chaveFiltro(c&&c.segmento), chaveFiltro(c&&c.grupo)
+  ].join("¦");
+}
+function clientesUnicos(lista){
+  const mapaRepresentantes = new Map();
+  const mapaClientes = new Map();
+  (lista || []).forEach(c=>{
+    const kr = chaveRepresentante(c && c.representante);
+    let cliente = c;
+    if(kr){
+      if(!mapaRepresentantes.has(kr)) mapaRepresentantes.set(kr, textoOriginal(c.representante));
+      const representanteExibido = mapaRepresentantes.get(kr);
+      if(c.representante !== representanteExibido) cliente = Object.assign({}, c, {representante:representanteExibido});
+    }
+    const k = chaveCliente(cliente);
+    if(k && !mapaClientes.has(k)) mapaClientes.set(k,cliente);
+  });
+  return [...mapaClientes.values()];
+}
+function filiaisUnicasPorEndereco(lista){
+  const mapa = new Map();
+  (lista || []).forEach(c=>{
+    const k = chaveComposta(enderecoCompleto(c), c&&c.cidade, estadoLimpo(c&&c.estado));
+    if(k && !mapa.has(k)) mapa.set(k,c);
+  });
+  return [...mapa.values()];
+}
+function restaurarSelecaoNormalizada(select, valorAnterior, tipo){
+  if(!valorAnterior){ select.value = ""; return; }
+  const alvo = chavePorTipo(valorAnterior, tipo);
+  const opcao = [...select.options].find(o => o.value && chavePorTipo(o.value, tipo) === alvo);
+  select.value = opcao ? opcao.value : "";
+}
+
+const CACHE_PREFIX = "trade_data_v3";
+const CACHE_TTL = {clientes:1800000, programacoes:60000, relatos:60000, vendedores:1800000};
+const DATA_TS = {clientes:0, programacoes:0, relatos:0, vendedores:0};
+const DATA_REQ = new Map();
+const DATA_CFG = {
+  clientes:{acao:"clientes", campo:"clientes"},
+  programacoes:{acao:"listarProg", campo:"programacoes"},
+  relatos:{acao:"listar", campo:"relatos"},
+  vendedores:{acao:"vendedores", campo:"vendedores"}
+};
+let CLIENTE_IDX = {porUF:new Map(), porCNPJ:new Map(), porLojaUF:new Map(), segmento:new Map()};
+function chaveLoja(uf,loja){ return chaveFiltro(estadoLimpo(uf))+"|"+chaveFiltro(loja); }
+function reindexarClientes(){
+  const porUF=new Map(), porCNPJ=new Map(), porLojaUF=new Map(), segmento=new Map();
+  CLIENTES.forEach(c=>{
+    const uf=estadoLimpo(c.estado);
+    if(uf){ if(!porUF.has(uf)) porUF.set(uf,new Map()); const lojas=porUF.get(uf); const kl=chaveFiltro(c.loja); if(kl && !lojas.has(kl)) lojas.set(kl,textoOriginal(c.loja)); }
+    const cj=soDigitos(c.cnpj); if(cj) porCNPJ.set(cj,c);
+    const k=chaveLoja(c.estado,c.loja);
+    if(!porLojaUF.has(k)) porLojaUF.set(k,[]);
+    porLojaUF.get(k).push(c);
+    if(c.segmento && !segmento.has(k)) segmento.set(k,c.segmento);
+  });
+  porLojaUF.forEach((lista,k)=>porLojaUF.set(k,filiaisUnicasPorEndereco(lista)));
+  CLIENTE_IDX={porUF,porCNPJ,porLojaUF,segmento};
+}
+function filiaisDaLoja(uf,loja){ return CLIENTE_IDX.porLojaUF.get(chaveLoja(uf,loja)) || []; }
+function cacheKey(tipo){ return CACHE_PREFIX+":"+((CRED&&CRED.email)||"anon").toLowerCase()+":"+tipo; }
+function lerCache(tipo){
+  try{ const x=JSON.parse(localStorage.getItem(cacheKey(tipo))||"null"); return x&&Array.isArray(x.data)?x:null; }catch(e){ return null; }
+}
+function gravarCache(tipo,data){
+  try{ localStorage.setItem(cacheKey(tipo),JSON.stringify({ts:Date.now(),data})); }catch(e){ /* quota/privacidade: app segue normalmente */ }
+}
+function limparCacheUsuario(){
+  Object.keys(DATA_CFG).forEach(tipo=>{ try{ localStorage.removeItem(cacheKey(tipo)); }catch(e){} });
+}
+function limparDadosMemoria(){
+  RELATOS=[]; CLIENTES=[]; PROGRAMACOES=[]; VENDEDORES=[];
+  Object.keys(DATA_TS).forEach(k=>DATA_TS[k]=0);
+  reindexarClientes();
+  Object.values(charts).forEach(c=>c&&c.destroy&&c.destroy()); charts={};
+}
+function aplicarDataset(tipo,data,ts){
+  if(!Array.isArray(data)) return;
+  if(tipo==="clientes"){ CLIENTES=clientesUnicos(data); reindexarClientes(); }
+  else if(tipo==="programacoes") PROGRAMACOES=data;
+  else if(tipo==="relatos"){ RELATOS=data; ULTIMA_CARGA=ts||Date.now(); }
+  else if(tipo==="vendedores") VENDEDORES=data;
+  DATA_TS[tipo]=ts||Date.now();
+}
+function hidratarCache(){
+  let achou=false;
+  Object.keys(DATA_CFG).forEach(tipo=>{ const x=lerCache(tipo); if(x){ aplicarDataset(tipo,x.data,x.ts); achou=true; } });
+  return achou;
+}
+function datasetFresco(tipo){ return DATA_TS[tipo] && (Date.now()-DATA_TS[tipo] < CACHE_TTL[tipo]); }
+async function atualizarDataset(tipo, forcar=false){
+  if(!DATA_CFG[tipo]) return false;
+  if(!forcar && datasetFresco(tipo)) return false;
+  if(DATA_REQ.has(tipo)) return DATA_REQ.get(tipo);
+  const cfg=DATA_CFG[tipo];
+  const req=api(cfg.acao).then(r=>{
+    if(r&&r.ok&&Array.isArray(r[cfg.campo])){ aplicarDataset(tipo,r[cfg.campo],Date.now()); gravarCache(tipo,r[cfg.campo]); return true; }
+    return false;
+  }).catch(()=>false).finally(()=>DATA_REQ.delete(tipo));
+  DATA_REQ.set(tipo,req);
+  return req;
+}
+async function atualizarDatasets(tipos, forcar=false){ return Promise.all(tipos.map(t=>atualizarDataset(t,forcar))); }
+function redesenharVisivel(){
+  populaFmUF(); renderPendentes(); renderHist();
+  if(!$(`vw-rel`).classList.contains("hide") && window.Chart) renderRel();
+  if(!$(`vw-lojas`).classList.contains("hide")) renderLojas();
+  if(!$(`vw-prog`).classList.contains("hide")) renderProg();
+  if(!$(`vw-dia`).classList.contains("hide")) renderDia();
+}
+
 /* ---------- API ---------- */
 // Content-Type text/plain evita o preflight CORS que o Apps Script nao responde
 async function api(acao, extra){
   const body = Object.assign({acao}, CRED || {}, extra || {});
-  const res = await fetch(API_URL, {
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body: JSON.stringify(body)
-  });
-  return await res.json();
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 25000);
+  try{
+    const res = await fetch(API_URL, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify(body),
+      signal:ctrl.signal,
+      cache:"no-store"
+    });
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    return await res.json();
+  } finally { clearTimeout(timer); }
 }
 
 function load(txt){ $("ov-load-txt").textContent = txt || "carregando..."; $("ov-load").classList.remove("hide"); }
@@ -547,10 +753,7 @@ async function entrar(){
   $("li-erro").style.display = "none";
   load("entrando...");
   try{
-    const r = await fetch(API_URL, {
-      method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify({acao:"login", email, senha})
-    }).then(x => x.json());
+    const r = await api("login", {email, senha});
     unload();
     if(!r.ok){ erroLogin(r.erro || "Falha no login."); return; }
     CRED = {email, senha};
@@ -563,8 +766,10 @@ async function entrar(){
 function erroLogin(msg){ $("li-erro").textContent = msg; $("li-erro").style.display = "block"; }
 
 $("nv-sair").onclick = () => {
+  limparCacheUsuario();
   localStorage.removeItem("trade_cred");
-  CRED = null; USER = null; RELATOS = [];
+  limparDadosMemoria();
+  CRED = null; USER = null;
   $("app").classList.add("hide"); $("login").classList.remove("hide");
   $("li-senha").value = "";
 };
@@ -580,66 +785,36 @@ async function iniciar(){
   $("fm-vend").textContent = USER.nome;
   $("ft-excel").classList.toggle("hide", !adm);
 
-  // carrega tudo em paralelo (1 espera em vez de 3 sequenciais)
-  load("carregando dados...");
-  try{
-    const [rc, rp, rr] = await Promise.all([
-      api("clientes").catch(()=>({ok:false})),
-      api("listarProg").catch(()=>({ok:false})),
-      api("listar").catch(()=>({ok:false}))
-    ]);
-    CLIENTES = rc.ok ? rc.clientes : [];
-    PROGRAMACOES = rp.ok ? rp.programacoes : [];
-    RELATOS = rr.ok ? rr.relatos : [];
-    ULTIMA_CARGA = Date.now();
-  }catch(e){ /* mantem o que tiver */ }
-  // admin: carrega a lista de vendedores para poder programar em nome de outro
-  if(adm){
-    try{ const rv = await api("vendedores"); if(rv.ok) VENDEDORES = rv.vendedores; }catch(e){}
-  }
-  unload();
-  populaFmUF();
-  renderPendentes(); renderHist();
+  // Mostra dados locais imediatamente; consulta somente o que a tela inicial precisa.
+  const tinhaCache = hidratarCache();
+  populaFmUF(); renderPendentes(); renderHist();
+  const precisaBloquear = !tinhaCache && !CLIENTES.length && !RELATOS.length;
+  if(precisaBloquear) load("carregando dados...");
+  await atualizarDatasets(["clientes","relatos"]);
+  if(precisaBloquear) unload();
+  redesenharVisivel();
 }
 
-async function carregarClientes(){
-  try{ const r = await api("clientes"); if(r.ok) CLIENTES = r.clientes; }
-  catch(e){}
+async function carregarClientes(forcar=false){
+  await atualizarDataset("clientes",forcar);
   populaFmUF();
 }
 
-async function carregarProgramacoes(){
-  try{ const r = await api("listarProg"); if(r.ok) PROGRAMACOES = r.programacoes; }
-  catch(e){}
+async function carregarProgramacoes(forcar=false){
+  await atualizarDataset("programacoes",forcar);
 }
 
-// recarrega os relatos do servidor (usado apos criar/excluir)
+// recarrega relatos do servidor (usado apos criar/excluir)
 async function recarregar(){
   load("atualizando...");
-  try{
-    const r = await api("listar");
-    if(r.ok){ RELATOS = r.relatos; ULTIMA_CARGA = Date.now(); }
-  }catch(e){}
+  await atualizarDataset("relatos",true);
   unload();
-  renderPendentes(); renderHist();
-  if(!$("vw-rel").classList.contains("hide")) renderRel();
-  if(!$("vw-lojas").classList.contains("hide")) renderLojas();
-  if(!$("vw-prog").classList.contains("hide")) renderProg();
-  if(!$("vw-dia").classList.contains("hide")) renderDia();
+  redesenharVisivel();
 }
 
-// atualiza clientes+programacoes+relatos em paralelo, em segundo plano
+// Mantido para compatibilidade: evita chamadas duplicadas e respeita o TTL.
 async function atualizarTudoBg(){
-  try{
-    const [rc, rp, rr] = await Promise.all([
-      api("clientes").catch(()=>({ok:false})),
-      api("listarProg").catch(()=>({ok:false})),
-      api("listar").catch(()=>({ok:false}))
-    ]);
-    if(rc.ok) CLIENTES = rc.clientes;
-    if(rp.ok) PROGRAMACOES = rp.programacoes;
-    if(rr.ok){ RELATOS = rr.relatos; ULTIMA_CARGA = Date.now(); }
-  }catch(e){}
+  await atualizarDatasets(["clientes","programacoes","relatos"]);
 }
 
 /* ---------- NAVEGACAO ---------- */
@@ -654,30 +829,40 @@ function irPara(v){
     }
   });
 }
-// cada aba: desenha JA com o cache, depois atualiza em segundo plano e redesenha
-$("nv-novo").onclick = () => irPara("novo");
-$("nv-hist").onclick = () => { irPara("hist"); renderHist(); };
-$("nv-rel").onclick  = () => { irPara("rel"); renderRel(); };
+// Cada aba usa o cache imediatamente e atualiza apenas os dados necessários.
+$("nv-novo").onclick = () => { irPara("novo"); atualizarDataset("clientes").then(populaFmUF); };
+$("nv-hist").onclick = () => { irPara("hist"); renderHist(); atualizarDataset("relatos").then(renderHist); };
+$("nv-rel").onclick  = async () => {
+  irPara("rel");
+  if(!window.Chart){
+    load("carregando graficos...");
+    try{ await garantirGraficos(); }catch(e){ unload(); alert("Nao foi possivel carregar os graficos."); return; }
+    unload();
+  }
+  renderRel();
+  atualizarDatasets(["relatos","clientes"]).then(()=>{ if(!$("vw-rel").classList.contains("hide")) renderRel(); });
+};
 $("nv-lojas").onclick = () => {
   irPara("lojas"); renderLojas();
-  atualizarTudoBg().then(()=>{ if(!$("vw-lojas").classList.contains("hide")) renderLojas(); });
+  atualizarDatasets(["clientes","relatos","programacoes"]).then(()=>{ if(!$("vw-lojas").classList.contains("hide")) renderLojas(); });
 };
 $("nv-prog").onclick = () => {
   irPara("prog"); renderProg();
-  atualizarTudoBg().then(()=>{ if(!$("vw-prog").classList.contains("hide")) renderProg(); });
+  const dados=["clientes","programacoes"]; if(USER.role==="admin") dados.push("vendedores");
+  atualizarDatasets(dados).then(()=>{ if(!$("vw-prog").classList.contains("hide")) renderProg(); });
 };
 $("nv-dia").onclick = () => {
   irPara("dia"); renderDia();
-  atualizarTudoBg().then(()=>{ if(!$("vw-dia").classList.contains("hide")) renderDia(); });
+  atualizarDataset("programacoes").then(()=>{ if(!$("vw-dia").classList.contains("hide")) renderDia(); });
 };
 
 /* ---------- FORMULARIO ---------- */
 function populaFmUF(){
-  const ufs = CLIENTES.length
-    ? [...new Set(CLIENTES.map(c=>c.estado).filter(Boolean))].sort()
-    : UFS;
+  const atual = $("fm-uf").value;
+  const ufs = valoresUnicos(CLIENTES.length ? CLIENTES.map(c=>c.estado) : UFS, "estado");
   $("fm-uf").innerHTML = '<option value="">UF</option>' +
-    ufs.map(u=>`<option value="${u}">${u}</option>`).join("");
+    ufs.map(u=>`<option value="${esc(u)}">${esc(u)}</option>`).join("");
+  restaurarSelecaoNormalizada($("fm-uf"), atual, "estado");
 }
 
 $("fm-uf").onchange = () => {
@@ -703,7 +888,8 @@ $("fm-uf").onchange = () => {
 
 function lojasDoEstado(){
   const uf = $("fm-uf").value;
-  return [...new Set(CLIENTES.filter(c=>c.estado===uf).map(c=>c.loja))].sort();
+  const lojas = CLIENTE_IDX.porUF.get(estadoLimpo(uf));
+  return lojas ? [...lojas.values()].sort((a,b)=>a.localeCompare(b,"pt-BR",{sensitivity:"base"})) : [];
 }
 function montaLojaDrop(filtro){
   const f = (filtro||"").toLowerCase().trim();
@@ -723,7 +909,7 @@ function montaLojaDrop(filtro){
   d.classList.remove("hide");
 }
 $("fm-loja-busca").onfocus = () => { if(!$("fm-loja-busca").disabled) montaLojaDrop($("fm-loja-busca").value); };
-$("fm-loja-busca").oninput = () => montaLojaDrop($("fm-loja-busca").value);
+$("fm-loja-busca").oninput = debounce(() => montaLojaDrop($("fm-loja-busca").value),100);
 document.addEventListener("click", e => {
   if(!e.target.closest("#fm-loja-drop,#fm-loja-busca")) $("fm-loja-drop").classList.add("hide");
 });
@@ -734,7 +920,7 @@ function selecionaLoja(loja){
   $("fm-loja-busca").value = loja;
   $("fm-loja-drop").classList.add("hide");
   $("fm-end-info").style.display = "none";
-  const filiais = CLIENTES.filter(c=>c.estado===uf && c.loja===loja);
+  const filiais = filiaisDaLoja(uf,loja);
   $("fm-end").innerHTML = '<option value="">Selecione o endereço...</option>' +
     filiais.map((c,i)=>`<option value="${i}">${esc(enderecoCompleto(c))} · ${esc(c.cidade)}</option>`).join("");
   $("fm-end-wrap").style.display = "block";
@@ -746,7 +932,7 @@ $("fm-end").onchange = () => {
   const idx = $("fm-end").value;
   if(idx===""){ $("fm-end-info").style.display="none"; return; }
   const uf = $("fm-end").dataset.uf, loja = $("fm-end").dataset.loja;
-  const filiais = CLIENTES.filter(c=>c.estado===uf && c.loja===loja);
+  const filiais = filiaisDaLoja(uf,loja);
   const c = filiais[parseInt(idx)];
   if(!c){ $("fm-end-info").style.display="none"; return; }
   $("fm-end-info").innerHTML = `<b>${esc(c.loja)}</b><br>${esc(enderecoCompleto(c))}<br>${esc(c.cidade)} — ${esc(c.estado)}` +
@@ -767,7 +953,7 @@ $("fm-cnpj").oninput = () => {
   const msg = $("fm-cnpj-msg");
   if(alvo.length < 14){ msg.style.display = "none"; return; }
   // acha a filial exata pelo CNPJ
-  const c = CLIENTES.find(x => soDigitos(x.cnpj) === alvo);
+  const c = CLIENTE_IDX.porCNPJ.get(alvo);
   if(!c){
     msg.style.display = "block";
     msg.style.color = "var(--rd)";
@@ -775,11 +961,11 @@ $("fm-cnpj").oninput = () => {
     return;
   }
   // preenche a cascata: estado -> loja -> endereco
-  $("fm-uf").value = c.estado;
+  $("fm-uf").value = estadoLimpo(c.estado);
   $("fm-loja-busca").disabled = false;
   selecionaLoja(c.loja);   // monta os enderecos da loja
   // seleciona a filial exata deste CNPJ
-  const filiais = CLIENTES.filter(x => x.estado===c.estado && x.loja===c.loja);
+  const filiais = filiaisDaLoja(c.estado,c.loja);
   const idx = filiais.findIndex(x => soDigitos(x.cnpj) === alvo);
   if(idx >= 0){ $("fm-end").value = String(idx); $("fm-end").onchange(); }
   msg.style.display = "block";
@@ -811,7 +997,7 @@ $("fm-enviar").onclick = async () => {
   const loSel = $("fm-loja").value, enSel = $("fm-end").value;
   if(loSel){
     loja = loSel;
-    const filiais = CLIENTES.filter(c=>c.estado===uf && c.loja===loja);
+    const filiais = filiaisDaLoja(uf,loja);
     if(enSel!==""){ const c = filiais[parseInt(enSel)]; if(c){ cidade=c.cidade; endereco=enderecoCompleto(c); } }
     else if(filiais[0]){ cidade = filiais[0].cidade; }
   }
@@ -853,7 +1039,7 @@ async function reanalisar(id){
 }
 
 /* ---------- HISTORICO ---------- */
-$("hs-busca").oninput = renderHist;
+$("hs-busca").oninput = debounce(renderHist,120);
 
 function podeExcluir(r){ return USER.role === "admin" || r.owner === CRED.email.toLowerCase(); }
 
@@ -1014,7 +1200,7 @@ document.addEventListener("click", e => {
   }
 });
 // busca dentro do dropdown de loja
-$("ft-loja-busca").oninput = () => montaLojaMulti($("ft-loja-busca").value);
+$("ft-loja-busca").oninput = debounce(() => montaLojaMulti($("ft-loja-busca").value),120);
 
 // monta a lista de lojas (com filtro de busca) no dropdown
 let _LOJAS_REL = [];
@@ -1025,7 +1211,7 @@ function montaLojaMulti(filtro){
   if(!alvo.length){ cont.innerHTML = `<div style="font-size:12px;color:var(--tx3);padding:6px">Nenhuma loja</div>`; }
   else {
     cont.innerHTML = alvo.slice(0,200).map(v => {
-      const on = FT_LOJA.has(v);
+      const on = conjuntoTemFiltro(FT_LOJA,v);
       return `<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;cursor:pointer;font-size:12px;border-radius:4px">
         <input type="checkbox" ${on?"checked":""} data-val="${esc(v)}" style="width:14px;height:14px;padding:0;accent-color:var(--cy)">
         <span style="color:var(--tx2)">${esc(v)}</span></label>`;
@@ -1033,7 +1219,7 @@ function montaLojaMulti(filtro){
     cont.querySelectorAll("input").forEach(inp => {
       inp.onchange = () => {
         const val = inp.getAttribute("data-val");
-        if(inp.checked) FT_LOJA.add(val); else FT_LOJA.delete(val);
+        if(inp.checked) conjuntoAdicionarFiltro(FT_LOJA,val); else conjuntoRemoverFiltro(FT_LOJA,val);
         atualizaBtnMulti("ft-loja-btn", FT_LOJA, "Todas");
         renderRel();
       };
@@ -1047,7 +1233,7 @@ function montaMulti(dropId, btnId, valores, setRef, rotuloVazio){
   if(!valores.length){ d.innerHTML = `<div style="font-size:12px;color:var(--tx3);padding:6px">Nenhuma opcao</div>`; }
   else {
     d.innerHTML = valores.map(v => {
-      const on = setRef.has(v);
+      const on = conjuntoTemFiltro(setRef,v);
       return `<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;cursor:pointer;font-size:12px;border-radius:4px">
         <input type="checkbox" ${on?"checked":""} data-val="${esc(v)}" style="width:14px;height:14px;padding:0;accent-color:var(--cy)">
         <span style="color:var(--tx2)">${esc(v)}</span></label>`;
@@ -1055,7 +1241,7 @@ function montaMulti(dropId, btnId, valores, setRef, rotuloVazio){
     d.querySelectorAll("input").forEach(inp => {
       inp.onchange = () => {
         const val = inp.getAttribute("data-val");
-        if(inp.checked) setRef.add(val); else setRef.delete(val);
+        if(inp.checked) conjuntoAdicionarFiltro(setRef,val); else conjuntoRemoverFiltro(setRef,val);
         atualizaBtnMulti(btnId, setRef, rotuloVazio);
         renderRel();
       };
@@ -1064,7 +1250,7 @@ function montaMulti(dropId, btnId, valores, setRef, rotuloVazio){
   atualizaBtnMulti(btnId, setRef, rotuloVazio);
 }
 function atualizaBtnMulti(btnId, setRef, rotuloVazio){
-  const n = setRef.size;
+  const n = tamanhoConjuntoFiltro(setRef);
   $(btnId).textContent = (n===0 ? rotuloVazio : n+" selecionada"+(n>1?"s":"")) + " ▾";
   $(btnId).style.color = n>0 ? "var(--cy)" : "";
   $(btnId).style.borderColor = n>0 ? "var(--cy)" : "";
@@ -1086,8 +1272,7 @@ $("mp-vis").onclick = () => {
 };
 
 function segmentoDaLoja(loja, estado){
-  const c = CLIENTES.find(x => x.loja===loja && x.estado===estado);
-  return c ? c.segmento : "";
+  return CLIENTE_IDX.segmento.get(chaveLoja(estado,loja)) || "";
 }
 
 function filtrados(ignoreLoja){
@@ -1097,12 +1282,12 @@ function filtrados(ignoreLoja){
   const lj = ignoreLoja ? "" : LOJA_FILTRO;
   return RELATOS.filter(r => {
     if(!r.analisado) return false;
-    if(v && r.vendedor !== v) return false;
-    if(u && r.estado !== u) return false;
-    if(lj && r.loja !== lj) return false;
+    if(v && !mesmoFiltro(r.vendedor, v)) return false;
+    if(u && !mesmoFiltro(r.estado, u)) return false;
+    if(lj && !mesmoFiltro(r.loja, lj)) return false;
     if(s && classeDe(r) !== s) return false;
-    if(FT_LOJA.size && !FT_LOJA.has(r.loja)) return false;
-    if(FT_SEG.size){ const seg = segmentoDaLoja(r.loja, r.estado); if(!FT_SEG.has(seg)) return false; }
+    if(FT_LOJA.size && !conjuntoTemFiltro(FT_LOJA, r.loja)) return false;
+    if(FT_SEG.size){ const seg = segmentoDaLoja(r.loja, r.estado); if(!conjuntoTemFiltro(FT_SEG, seg)) return false; }
     const d = new Date(r.data);
     if(de && d < new Date(de)) return false;
     if(ate){ const t = new Date(ate); t.setHours(23,59,59); if(d > t) return false; }
@@ -1138,18 +1323,19 @@ function renderKPIDetalhe(F){
     </div>`;
 
   if(KPI_ABERTO === "visitas"){
-    const porV = {}; F.forEach(r => porV[r.vendedor] = (porV[r.vendedor]||0)+1);
-    const itens = Object.entries(porV).sort((a,b)=>b[1]-a[1]);
+    const porV = new Map();
+    F.forEach(r => { const k=chaveFiltro(r.vendedor); if(!k) return; if(!porV.has(k)) porV.set(k,{nome:r.vendedor,total:0}); porV.get(k).total++; });
+    const itens = [...porV.values()].sort((a,b)=>b.total-a.total).map(x=>[x.nome,x.total]);
     el.innerHTML = wrap("VISITAS POR VENDEDOR", "#00E5FF",
       itens.map(([n,q])=>linha(n, q+(q===1?" visita":" visitas"), "#00E5FF")).join("") || semDado());
 
   } else if(KPI_ABERTO === "lojas"){
     // lista de lojas ignora o proprio filtro de loja, para nao colapsar em uma so
     const baseLojas = filtrados(true);
-    const lojas = [...new Set(baseLojas.map(r=>r.loja).filter(Boolean))].sort();
+    const lojas = valoresUnicos(baseLojas.map(r=>r.loja));
     const linhaLoja = (lj) => {
-      const n = baseLojas.filter(r=>r.loja===lj).length;
-      const ativa = LOJA_FILTRO === lj;
+      const n = baseLojas.filter(r=>mesmoFiltro(r.loja,lj)).length;
+      const ativa = mesmoFiltro(LOJA_FILTRO, lj);
       return `<div onclick="filtrarLoja('${lj.replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;
         align-items:center;padding:8px 10px;border-radius:6px;cursor:pointer;margin-bottom:2px;
         background:${ativa?'rgba(139,92,246,.15)':'transparent'};border:1px solid ${ativa?'#8B5CF6':'transparent'}">
@@ -1185,23 +1371,23 @@ function renderKPIDetalhe(F){
 function semDado(){ return `<div style="font-size:13px;color:var(--tx3);padding:6px 0">Nenhum dado no filtro atual</div>`; }
 
 function filtrarLoja(lj){
-  LOJA_FILTRO = (LOJA_FILTRO === lj) ? "" : lj;
+  LOJA_FILTRO = mesmoFiltro(LOJA_FILTRO, lj) ? "" : lj;
   renderRel();
 }
 
 function renderRel(){
   // opcoes dos filtros simples
-  [["ft-vend","vendedor"],["ft-uf","estado"]].forEach(([id,campo]) => {
+  [["ft-vend","vendedor","nome"],["ft-uf","estado","estado"]].forEach(([id,campo,tipo]) => {
     const atual = $(id).value;
-    const vals = [...new Set(RELATOS.map(r => r[campo]).filter(Boolean))].sort();
+    const vals = valoresUnicos(RELATOS.map(r => r[campo]), tipo);
     $(id).innerHTML = `<option value="">Todos</option>` + vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
-    $(id).value = atual;
+    restaurarSelecaoNormalizada($(id), atual, tipo);
   });
 
   // filtros: segmento (dos clientes visitados) e loja (com busca)
   const analisados = RELATOS.filter(r=>r.analisado);
-  const segsVis = [...new Set(analisados.map(r=>segmentoDaLoja(r.loja,r.estado)).filter(Boolean))].sort();
-  _LOJAS_REL = [...new Set(analisados.map(r=>r.loja).filter(Boolean))].sort();
+  const segsVis = valoresUnicos(analisados.map(r=>segmentoDaLoja(r.loja,r.estado)));
+  _LOJAS_REL = valoresUnicos(analisados.map(r=>r.loja));
   montaMulti("ft-seg-drop","ft-seg-btn",segsVis,FT_SEG,"Todos");
   montaLojaMulti($("ft-loja-busca") ? $("ft-loja-busca").value : "");
 
@@ -1209,8 +1395,8 @@ function renderRel(){
   const cont = (arr,campo) => arr.reduce((s,r)=>s+(r[campo]?r[campo].length:0),0);
   const kpi = [
     ["Visitas", F.length, "var(--cy)", "visitas"],
-    ["Lojas", new Set(F.map(r=>r.loja).filter(Boolean)).size, "var(--pu)", "lojas"],
-    ["Estados", new Set(F.map(r=>r.estado)).size, "var(--mg)", "estados"],
+    ["Lojas", contarUnicos(F.map(r=>r.loja)), "var(--pu)", "lojas"],
+    ["Estados", contarUnicos(F.map(r=>r.estado), "estado"), "var(--mg)", "estados"],
     ["Oportunidades", cont(F,"oportunidades"), "var(--gr)", "oportunidades"],
     ["Perdas", cont(F,"perdas"), "var(--rd)", "perdas"]
   ];
@@ -1340,9 +1526,10 @@ function alterna(id){ ABERTOS.has(id) ? ABERTOS.delete(id) : ABERTOS.add(id); re
 
 /* ---------- GRAFICOS ---------- */
 function desenharGraficos(F){
+  if(!window.Chart) return;
   Object.values(charts).forEach(c => c && c.destroy());
   charts = {};
-  const base = {responsive:true, maintainAspectRatio:false, animation:{duration:300},
+  const base = {responsive:true, maintainAspectRatio:false, animation:false,
     resizeDelay:120,
     plugins:{legend:{labels:{color:"#B8C4D9",font:{size:11},boxWidth:12}}},
     scales:{x:{ticks:{color:"#8494AD",font:{size:10}},grid:{color:"#1E2A3A"}},
@@ -1353,7 +1540,7 @@ function desenharGraficos(F){
     data:{labels:["Promotor","Passivo","Detrator"],
       datasets:[{data:sent,backgroundColor:[SC.promotor,SC.passivo,SC.detrator],borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:"58%",
-      animation:{duration:300}, resizeDelay:120,
+      animation:false, resizeDelay:120,
       plugins:{legend:{position:"bottom",labels:{color:"#B8C4D9",font:{size:11},padding:12,boxWidth:12}}}}});
 
   // painel de faixas
@@ -1371,9 +1558,11 @@ function desenharGraficos(F){
       </div>
     </div>`;
 
-  const mv = {}; F.forEach(r => mv[r.vendedor] = (mv[r.vendedor]||0)+1);
+  const mvMap = new Map();
+  F.forEach(r=>{ const k=chaveFiltro(r.vendedor); if(!k) return; if(!mvMap.has(k)) mvMap.set(k,{nome:r.vendedor,total:0}); mvMap.get(k).total++; });
+  const mv = [...mvMap.values()];
   charts.c2 = new Chart($("ch2"), {type:"bar",
-    data:{labels:Object.keys(mv),datasets:[{label:"Visitas",data:Object.values(mv),
+    data:{labels:mv.map(x=>x.nome),datasets:[{label:"Visitas",data:mv.map(x=>x.total),
       backgroundColor:"#00E5FF",borderRadius:4}]},
     options:Object.assign({indexAxis:"y"},base,{plugins:{legend:{display:false}}})});
 
@@ -1551,7 +1740,10 @@ function ordenarConc(){
 }
 
 /* ---------- EXPORTAR EXCEL ---------- */
-$("ft-excel").onclick = () => {
+$("ft-excel").onclick = async () => {
+  load("preparando Excel...");
+  try{ await garantirExcel(); }catch(e){ unload(); alert("Nao foi possivel carregar o exportador Excel."); return; }
+  unload();
   const F = filtrados();
   if(!F.length){ alert("Nenhum relato no filtro atual."); return; }
   const j = a => (a && a.length) ? a.join("\n") : "";
@@ -1569,15 +1761,16 @@ $("ft-excel").onclick = () => {
     ["NPS (% promotores - % detratores)", (RX.nps>0?"+":"")+RX.nps],
     ["Nota media (0 a 10)", mediaX],[],
     ["INDICADORES"],["Visitas","Lojas","Estados","Oportunidades","Perdas"],
-    [F.length,new Set(F.map(r=>r.loja).filter(Boolean)).size,new Set(F.map(r=>r.estado)).size,cont("oportunidades"),cont("perdas")],[],
+    [F.length,contarUnicos(F.map(r=>r.loja)),contarUnicos(F.map(r=>r.estado),"estado"),cont("oportunidades"),cont("perdas")],[],
     ["CLASSIFICACAO NPS"],["Classificacao","Lojas","%","Distribuicao"]];
   const sent = ["promotor","passivo","detrator"].map(s=>[s,F.filter(r=>classeDe(r)===s).length]);
   const mxS = Math.max(...sent.map(s=>s[1]),1);
   sent.forEach(([s,n]) => D.push([s,n,F.length?Math.round(n/F.length*100)+"%":"0%",barra(n,mxS)]));
   D.push([],["VISITAS POR VENDEDOR"],["Vendedor","Visitas","%","Distribuicao"]);
-  const mv={}; F.forEach(r=>mv[r.vendedor]=(mv[r.vendedor]||0)+1);
-  const mxV=Math.max(...Object.values(mv),1);
-  Object.entries(mv).sort((a,b)=>b[1]-a[1]).forEach(([v,n])=>D.push([v,n,Math.round(n/F.length*100)+"%",barra(n,mxV)]));
+  const mvMap=new Map(); F.forEach(r=>{const k=chaveFiltro(r.vendedor);if(!k)return;if(!mvMap.has(k))mvMap.set(k,{nome:r.vendedor,total:0});mvMap.get(k).total++;});
+  const mv=[...mvMap.values()];
+  const mxV=Math.max(...mv.map(x=>x.total),1);
+  mv.sort((a,b)=>b.total-a.total).forEach(x=>D.push([x.nome,x.total,Math.round(x.total/F.length*100)+"%",barra(x.total,mxV)]));
   D.push([],["CONCORRENTES CITADOS"],["Concorrente","Mencoes","","Distribuicao"]);
   const mc={}; F.forEach(r=>r.concorrentes.forEach(c=>mc[c]=(mc[c]||0)+1));
   const mxC=Math.max(...Object.values(mc),1);
@@ -1660,8 +1853,8 @@ function renderInsights(F){
   const menorUF = ufsNPS.length ? ufsNPS[0] : null;
 
   const porLoja = {};
-  F.forEach(r => { if(r.loja) (porLoja[r.loja]=porLoja[r.loja]||[]).push(r); });
-  const lojasNPS = Object.entries(porLoja).map(([l,li])=>[l,calcularNPS(li).nps]).sort((a,b)=>a[1]-b[1]);
+  F.forEach(r => { if(r.loja){ const k=chaveFiltro(r.loja); if(!porLoja[k]) porLoja[k]={nome:r.loja,itens:[]}; porLoja[k].itens.push(r); } });
+  const lojasNPS = Object.values(porLoja).map(x=>[x.nome,calcularNPS(x.itens).nps]).sort((a,b)=>a[1]-b[1]);
 
   const ultima = [...F].sort((a,b)=>new Date(b.data)-new Date(a.data))[0];
 
@@ -1700,8 +1893,8 @@ function abrirInsight(key){
     $("kpipop-titulo").textContent = "NPS POR ESTADO (menor para maior)";
     $("kpipop-corpo").innerHTML = arr.map(x=>linha(`${x.uf} · ${x.reg} <span style="color:var(--tx3);font-size:11px">(${x.n} visitas)</span>`, (x.nps>0?"+":"")+x.nps, corNPS(x.nps))).join("") || semDado();
   } else if(key==="menorLojas"){
-    const porLoja = {}; F.forEach(r=>{if(r.loja)(porLoja[r.loja]=porLoja[r.loja]||[]).push(r);});
-    const arr = Object.entries(porLoja).map(([l,li])=>({l,nps:calcularNPS(li).nps,n:li.length,cidade:li[0].cidade,uf:li[0].estado})).sort((a,b)=>a.nps-b.nps);
+    const porLoja = {}; F.forEach(r=>{if(r.loja){const k=chaveFiltro(r.loja);if(!porLoja[k])porLoja[k]={nome:r.loja,itens:[]};porLoja[k].itens.push(r);}});
+    const arr = Object.values(porLoja).map(x=>({l:x.nome,nps:calcularNPS(x.itens).nps,n:x.itens.length,cidade:x.itens[0].cidade,uf:x.itens[0].estado})).sort((a,b)=>a.nps-b.nps);
     $("kpipop-titulo").textContent = "NPS POR LOJA (menor para maior)";
     $("kpipop-corpo").innerHTML = arr.map(x=>linha(`${esc(x.l)} <span style="color:var(--tx3);font-size:11px">${esc(x.cidade)}/${esc(x.uf)} · ${x.n}v</span>`, (x.nps>0?"+":"")+x.nps, corNPS(x.nps))).join("") || semDado();
   } else if(key==="ultima"){
@@ -1724,26 +1917,26 @@ function fechaKpiPop(){ $("ov-kpi").classList.add("hide"); }
 /* ---------- MAPA POPUP ---------- */
 function fechaMapaPopup(){ $("ov-mapa").classList.add("hide"); }
 function abrirMapaPopup(uf, F){
-  const lista = F.filter(r=>r.estado===uf);
+  const lista = F.filter(r=>mesmoFiltro(r.estado,uf));
   if(!lista.length) return;
   $("mp-titulo").textContent = uf + " · " + lista.length + (lista.length===1?" visita":" visitas");
-  const porCidade = {};
+  const porCidade = new Map();
   lista.forEach(r => {
-    const c = r.cidade || "(sem cidade)";
-    if(!porCidade[c]) porCidade[c] = {visitas:0, vendedores:new Set(), ultima:"", lojas:{}};
-    porCidade[c].visitas++;
-    porCidade[c].vendedores.add(r.vendedor);
-    if(r.loja) porCidade[c].lojas[r.loja] = (porCidade[c].lojas[r.loja]||0)+1;
-    if(!porCidade[c].ultima || r.data > porCidade[c].ultima) porCidade[c].ultima = r.data;
+    const c = r.cidade || "(sem cidade)", kc=chaveFiltro(c);
+    if(!porCidade.has(kc)) porCidade.set(kc,{nome:c,visitas:0,vendedores:new Map(),ultima:"",lojas:new Map()});
+    const info=porCidade.get(kc); info.visitas++;
+    const kv=chaveFiltro(r.vendedor); if(kv && !info.vendedores.has(kv)) info.vendedores.set(kv,r.vendedor);
+    if(r.loja){ const kl=chaveFiltro(r.loja); if(!info.lojas.has(kl)) info.lojas.set(kl,{nome:r.loja,total:0}); info.lojas.get(kl).total++; }
+    if(!info.ultima || r.data > info.ultima) info.ultima = r.data;
   });
-  $("mp-corpo").innerHTML = Object.entries(porCidade).sort((a,b)=>b[1].visitas-a[1].visitas).map(([c,info])=>{
-    const lojas = Object.entries(info.lojas).sort((a,b)=>b[1]-a[1]);
+  $("mp-corpo").innerHTML = [...porCidade.values()].sort((a,b)=>b.visitas-a.visitas).map(info=>{
+    const c=info.nome, lojas=[...info.lojas.values()].sort((a,b)=>b.total-a.total).map(x=>[x.nome,x.total]);
     return `<div style="padding:12px 0;border-bottom:1px solid var(--bd)">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <b style="font-size:14px">${esc(c)}</b>
         <span style="font-size:12px;font-weight:700;color:var(--cy);background:rgba(0,229,255,.12);padding:2px 10px;border-radius:4px">${info.visitas}</span>
       </div>
-      <div style="font-size:12px;color:var(--tx2);margin-top:4px">${[...info.vendedores].join(", ")} · ultima: ${dtBR(info.ultima)}</div>
+      <div style="font-size:12px;color:var(--tx2);margin-top:4px">${[...info.vendedores.values()].join(", ")} · ultima: ${dtBR(info.ultima)}</div>
       ${lojas.length?`<div style="margin-top:8px;padding-left:10px;border-left:2px solid var(--bd)">
         ${lojas.map(([lj,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0">
           <span style="font-size:12px;color:var(--tx2)">${esc(lj)}</span>
@@ -1759,13 +1952,13 @@ function abrirMapaPopup(uf, F){
    ============================================================ */
 function lojasVisitadasSet(){
   // chave loja|estado das lojas ja visitadas (relatos analisados)
-  return new Set(RELATOS.filter(r=>r.analisado && r.loja).map(r=>r.loja+"|"+r.estado));
+  return new Set(RELATOS.filter(r=>r.analisado && r.loja).map(r=>chaveLoja(r.estado,r.loja)));
 }
 function progIndex(){
   // mapa loja|estado -> { lista:[progs], prox: prog mais proxima, total:n }
   const m = {};
   PROGRAMACOES.forEach(p => {
-    const k = p.loja+"|"+p.estado;
+    const k = chaveLoja(p.estado,p.loja);
     if(!m[k]) m[k] = { lista:[], prox:null, total:0 };
     m[k].lista.push(p);
     m[k].total++;
@@ -1778,10 +1971,11 @@ function progIndex(){
   });
   return m;
 }
-function preencheSelect(id, valores, rotuloTodos){
+function preencheSelect(id, valores, rotuloTodos, tipo){
   const atual = $(id).value;
-  $(id).innerHTML = `<option value="">${rotuloTodos}</option>` + valores.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
-  $(id).value = atual;
+  const unicos = valoresUnicos(valores, tipo);
+  $(id).innerHTML = `<option value="">${rotuloTodos}</option>` + unicos.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  restaurarSelecaoNormalizada($(id), atual, tipo);
 }
 function primeiroEUltimoDiaDoMes(){
   const h = new Date();
@@ -1792,7 +1986,7 @@ function primeiroEUltimoDiaDoMes(){
 }
 
 ["lj-de","lj-ate","lj-uf","lj-cidade","lj-seg","lj-vend"].forEach(id => $(id).onchange = renderLojas);
-$("lj-busca").oninput = renderLojas;
+$("lj-busca").oninput = debounce(renderLojas,150);
 $("lj-limpar").onclick = () => {
   const [p,u] = primeiroEUltimoDiaDoMes();
   $("lj-de").value = p; $("lj-ate").value = u;
@@ -1809,33 +2003,33 @@ function renderLojas(){
   const de=$("lj-de").value, ate=$("lj-ate").value;
 
   // filtros
-  preencheSelect("lj-uf", [...new Set(CLIENTES.map(c=>c.estado).filter(Boolean))].sort(), "Todos");
-  const baseCid = uf ? CLIENTES.filter(c=>c.estado===uf) : CLIENTES;
-  preencheSelect("lj-cidade", [...new Set(baseCid.map(c=>c.cidade).filter(Boolean))].sort(), "Todas");
-  preencheSelect("lj-seg", [...new Set(CLIENTES.map(c=>c.segmento).filter(Boolean))].sort(), "Todos");
+  preencheSelect("lj-uf", CLIENTES.map(c=>c.estado), "Todos", "estado");
+  const baseCid = uf ? CLIENTES.filter(c=>mesmoFiltro(c.estado,uf)) : CLIENTES;
+  preencheSelect("lj-cidade", baseCid.map(c=>c.cidade), "Todas");
+  preencheSelect("lj-seg", CLIENTES.map(c=>c.segmento), "Todos");
   // filtro de vendedor: usa a lista completa de vendedores; se nao houver, cai pros que ja programaram
   const nomesVend = VENDEDORES.length
     ? VENDEDORES.filter(v=>v.role==="vendedor").map(v=>v.nome)
-    : [...new Set(PROGRAMACOES.map(p=>p.vendedor).filter(Boolean))];
-  preencheSelect("lj-vend", nomesVend.sort(), "Todos");
+    : valoresUnicos(PROGRAMACOES.map(p=>p.vendedor));
+  preencheSelect("lj-vend", nomesVend, "Todos", "nome");
 
   const visit = lojasVisitadasSet();
   const prog = progIndex();
 
   // lojas nao visitadas: agrupa por loja+estado (todas as filiais somam)
-  let clientes = CLIENTES.filter(c => !visit.has(c.loja+"|"+c.estado));
-  if(uf) clientes = clientes.filter(c=>c.estado===uf);
-  if(cid) clientes = clientes.filter(c=>c.cidade===cid);
-  if(seg) clientes = clientes.filter(c=>c.segmento===seg);
+  let clientes = CLIENTES.filter(c => !visit.has(chaveLoja(c.estado,c.loja)));
+  if(uf) clientes = clientes.filter(c=>mesmoFiltro(c.estado,uf));
+  if(cid) clientes = clientes.filter(c=>mesmoFiltro(c.cidade,cid));
+  if(seg) clientes = clientes.filter(c=>mesmoFiltro(c.segmento,seg));
 
   // agrupa por loja+estado
   const grupos = {};
   clientes.forEach(c => {
-    const k = c.loja+"|"+c.estado;
-    if(!grupos[k]) grupos[k] = {loja:c.loja, estado:c.estado, cidade:c.cidade, representante:c.representante, segmento:c.segmento, cod:c.cod, filiais:[]};
+    const k = chaveLoja(c.estado,c.loja);
+    if(!grupos[k]) grupos[k] = {loja:c.loja, estado:c.estado, cidade:c.cidade, representante:c.representante, segmento:c.segmento, grupo:c.grupo, cod:c.cod, filiais:[]};
     grupos[k].filiais.push(c);
   });
-  let lista = Object.values(grupos);
+  let lista = Object.values(grupos).map(g=>{ g.filiais=filiaisUnicasPorEndereco(g.filiais); return g; });
 
   // filtro por programacao dentro do intervalo + vendedor
   const dentroIntervalo = (p) => {
@@ -1846,14 +2040,14 @@ function renderLojas(){
     return true;
   };
   if(vend){
-    lista = lista.filter(g => { const o = prog[g.loja+"|"+g.estado]; return o && o.lista.some(p=>p.vendedor===vend); });
+    lista = lista.filter(g => { const o = prog[chaveLoja(g.estado,g.loja)]; return o && o.lista.some(p=>mesmoFiltro(p.vendedor,vend)); });
   }
   // busca por nome da loja
   const busca = ($("lj-busca").value||"").toLowerCase().trim();
   if(busca) lista = lista.filter(g => g.loja.toLowerCase().includes(busca));
 
   const totalProg = lista.filter(g => {
-    const o = prog[g.loja+"|"+g.estado];
+    const o = prog[chaveLoja(g.estado,g.loja)];
     return o && o.lista.some(p=>dentroIntervalo(p));
   }).length;
   const adm = USER && USER.role==="admin";
@@ -1868,12 +2062,14 @@ function renderLojas(){
       <div style="font-size:10px;color:var(--tx2);font-weight:600;letter-spacing:.06em;margin-top:6px">TOTAL PROGRAMADO</div>
     </div>`;
 
-  lista.sort((a,b)=>a.loja.localeCompare(b.loja));
+  lista.sort((a,b)=>a.loja.localeCompare(b.loja,"pt-BR",{sensitivity:"accent"}));
+  window._LJ_GRUPOS = {};
+  lista.forEach((g,i)=>{ g.__gid="grupo_"+i; window._LJ_GRUPOS[g.__gid]=g; });
   $("lj-lista").innerHTML = lista.length ? lista.map(g => {
-    const o = prog[g.loja+"|"+g.estado];
+    const o = prog[chaveLoja(g.estado,g.loja)];
     const p = o ? o.prox : null;
     const temProg = o && o.lista.some(x=>dentroIntervalo(x));
-    const gid = (g.loja+"|"+g.estado).replace(/[^a-zA-Z0-9]/g,"_");
+    const gid = g.__gid;
     const daOutro = temProg && p && p.isOwn === false;   // programado por outro vendedor
     const corBorda = temProg ? (daOutro ? "var(--pu)" : "var(--am)") : "var(--bd)";
     const qtd = o ? o.total : 0;
@@ -1905,8 +2101,6 @@ function renderLojas(){
     </div>`;
   }).join("") : `<div class="mono" style="text-align:center;padding:40px;color:var(--tx3);font-size:13px">// nenhuma loja nao visitada com esses filtros</div>`;
 
-  window._LJ_GRUPOS = {};
-  lista.forEach(g => { window._LJ_GRUPOS[(g.loja+"|"+g.estado).replace(/[^a-zA-Z0-9]/g,"_")] = g; });
 }
 
 function abrirLojaPopup(gid){
@@ -1936,9 +2130,15 @@ function montaProgVend(donoEmail){
   const adm = USER && USER.role==="admin";
   $("prog-vend-wrap").style.display = adm ? "block" : "none";
   if(!adm) return;
-  const vends = VENDEDORES.length ? VENDEDORES : [{email:USER.email, nome:USER.nome, role:USER.role}];
+  const baseVends = VENDEDORES.length ? VENDEDORES : [{email:USER.email, nome:USER.nome, role:USER.role}];
+  const vistosVend = new Set();
+  const vends = baseVends.filter(v => {
+    const chave = chaveFiltro(v.nome || v.email);
+    if(!chave || vistosVend.has(chave)) return false;
+    vistosVend.add(chave); return true;
+  });
   $("prog-vend").innerHTML = vends.map(v =>
-    `<option value="${esc(v.email)}">${esc(v.nome)}${v.role==="admin"?" (admin)":""}</option>`).join("");
+    `<option value="${esc(textoLimpo(v.email))}">${esc(textoOriginal(v.nome))}${v.role==="admin"?" (admin)":""}</option>`).join("");
   const alvo = (donoEmail || USER.email || "").toLowerCase();
   if([...$("prog-vend").options].some(o=>o.value===alvo)) $("prog-vend").value = alvo;
 }
@@ -2105,14 +2305,20 @@ document.addEventListener("pointerup", e => {
   PROG_ARRASTA = null;
 });
 
-function abrirProgLoja(gid){
+async function abrirProgLoja(gid){
+  if(USER && USER.role==="admin" && !VENDEDORES.length){
+    load("carregando vendedores...");
+    await atualizarDataset("vendedores");
+    unload();
+  }
   const g = window._LJ_GRUPOS && window._LJ_GRUPOS[gid];
   if(!g) return;
   // sempre cria novas visitas (uma loja pode ter varias no mes)
   PROG_EDIT = { codCliente:g.cod, loja:g.loja, estado:g.estado, cidade:g.cidade, editId:"" };
   $("prog-titulo").textContent = "PROGRAMAR VISITA(S)";
   $("prog-loja-info").innerHTML = `<b>${esc(g.loja)}</b><br>${esc(g.cidade)} — ${esc(g.estado)}`;
-  $("prog-end").innerHTML = g.filiais.map((c,i)=>`<option value="${esc(enderecoCompleto(c))}">${esc(enderecoCompleto(c))}</option>`).join("");
+  const enderecos = valoresUnicos(g.filiais.map(c=>enderecoCompleto(c)));
+  $("prog-end").innerHTML = enderecos.map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join("");
   $("prog-datas").innerHTML = "";
   PROG_CAL_MES = new Date();       // mes atual
   atualizaLimiteDatas();
@@ -2123,15 +2329,18 @@ function abrirProgLoja(gid){
 function fechaProg(){ $("ov-prog").classList.add("hide"); PROG_EDIT = null; }
 
 /* ---------- excel lojas nao visitadas ---------- */
-$("lj-excel").onclick = () => {
+$("lj-excel").onclick = async () => {
+  load("preparando Excel...");
+  try{ await garantirExcel(); }catch(e){ unload(); alert("Nao foi possivel carregar o exportador Excel."); return; }
+  unload();
   const visit = lojasVisitadasSet(), prog = progIndex();
   const uf=$("lj-uf").value, cid=$("lj-cidade").value, seg=$("lj-seg").value;
-  let cs = CLIENTES.filter(c=>!visit.has(c.loja+"|"+c.estado));
-  if(uf) cs=cs.filter(c=>c.estado===uf);
-  if(cid) cs=cs.filter(c=>c.cidade===cid);
-  if(seg) cs=cs.filter(c=>c.segmento===seg);
+  let cs = CLIENTES.filter(c=>!visit.has(chaveLoja(c.estado,c.loja)));
+  if(uf) cs=cs.filter(c=>mesmoFiltro(c.estado,uf));
+  if(cid) cs=cs.filter(c=>mesmoFiltro(c.cidade,cid));
+  if(seg) cs=cs.filter(c=>mesmoFiltro(c.segmento,seg));
   const ws = XLSX.utils.json_to_sheet(cs.map(c=>{
-    const p = prog[c.loja+"|"+c.estado];
+    const p = prog[chaveLoja(c.estado,c.loja)];
     return {LOJA:c.loja, ENDERECO:enderecoCompleto(c), CIDADE:c.cidade, ESTADO:c.estado,
       SEGMENTO:c.segmento, REPRESENTANTE:c.representante,
       "VISITA PROGRAMADA": p?dtBR(p.dataProgramada):"", "VENDEDOR": p?p.vendedor:""};
@@ -2155,8 +2364,7 @@ $("pg-limpar").onclick = () => {
 };
 
 function segmentoDaProg(p){
-  const c = CLIENTES.find(x=>x.loja===p.loja && x.estado===p.estado);
-  return c ? c.segmento : "";
+  return CLIENTE_IDX.segmento.get(chaveLoja(p.estado,p.loja)) || "";
 }
 
 function renderProg(){
@@ -2168,23 +2376,23 @@ function renderProg(){
   // todos veem todas as programacoes
   const universo = PROGRAMACOES;
 
-  preencheSelect("pg-uf", [...new Set(universo.map(p=>p.estado).filter(Boolean))].sort(), "Todos");
-  const baseCid = uf ? universo.filter(p=>p.estado===uf) : universo;
-  preencheSelect("pg-cidade", [...new Set(baseCid.map(p=>p.cidade).filter(Boolean))].sort(), "Todas");
-  preencheSelect("pg-seg", [...new Set(universo.map(p=>segmentoDaProg(p)).filter(Boolean))].sort(), "Todos");
+  preencheSelect("pg-uf", universo.map(p=>p.estado), "Todos", "estado");
+  const baseCid = uf ? universo.filter(p=>mesmoFiltro(p.estado,uf)) : universo;
+  preencheSelect("pg-cidade", baseCid.map(p=>p.cidade), "Todas");
+  preencheSelect("pg-seg", universo.map(p=>segmentoDaProg(p)), "Todos");
   const nomesVendPg = VENDEDORES.length
     ? VENDEDORES.filter(v=>v.role==="vendedor").map(v=>v.nome)
-    : [...new Set(universo.map(p=>p.vendedor).filter(Boolean))];
-  preencheSelect("pg-vend", nomesVendPg.sort(), "Todos");
+    : valoresUnicos(universo.map(p=>p.vendedor));
+  preencheSelect("pg-vend", nomesVendPg, "Todos", "nome");
 
   let lista = universo.filter(p => {
     const d = new Date(p.dataProgramada);
     if(de && d < new Date(de)) return false;
     if(ate){ const t=new Date(ate); t.setHours(23,59,59); if(d>t) return false; }
-    if(uf && p.estado!==uf) return false;
-    if(cid && p.cidade!==cid) return false;
-    if(vend && p.vendedor!==vend) return false;
-    if(seg && segmentoDaProg(p)!==seg) return false;
+    if(uf && !mesmoFiltro(p.estado,uf)) return false;
+    if(cid && !mesmoFiltro(p.cidade,cid)) return false;
+    if(vend && !mesmoFiltro(p.vendedor,vend)) return false;
+    if(seg && !mesmoFiltro(segmentoDaProg(p),seg)) return false;
     if(soAnota && !(p.anotacao||"").trim()) return false;
     return true;
   }).sort((a,b)=>new Date(a.dataProgramada)-new Date(b.dataProgramada));
@@ -2224,14 +2432,19 @@ function renderProg(){
   }).join("") : `<div class="mono" style="text-align:center;padding:40px;color:var(--tx3);font-size:13px">// nenhuma visita programada nesse periodo</div>`;
 }
 
-function editarProg(id){
+async function editarProg(id){
+  if(USER && USER.role==="admin" && !VENDEDORES.length){
+    load("carregando vendedores...");
+    await atualizarDataset("vendedores");
+    unload();
+  }
   const p = PROGRAMACOES.find(x=>x.id===id); if(!p) return;
-  const filiais = CLIENTES.filter(c=>c.loja===p.loja && c.estado===p.estado);
+  const filiais = filiaisDaLoja(p.estado,p.loja);
   PROG_EDIT = { codCliente:p.codCliente, loja:p.loja, estado:p.estado, cidade:p.cidade, editId:p.id };
   $("prog-titulo").textContent = "EDITAR PROGRAMACAO";
   $("prog-loja-info").innerHTML = `<b>${esc(p.loja)}</b><br>${esc(p.cidade)} — ${esc(p.estado)}`;
-  const ends = filiais.length ? filiais.map(c=>enderecoCompleto(c)) : (p.endereco?[p.endereco]:[]);
-  if(p.endereco && ends.indexOf(p.endereco)===-1) ends.unshift(p.endereco);
+  const ends = valoresUnicos(filiais.length ? filiais.map(c=>enderecoCompleto(c)) : (p.endereco?[p.endereco]:[]));
+  if(p.endereco && !ends.some(e=>mesmoFiltro(e,p.endereco))) ends.unshift(p.endereco);
   $("prog-end").innerHTML = ends.map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join("") || `<option value="">(sem endereço)</option>`;
   if(p.endereco) $("prog-end").value = p.endereco;
   $("prog-datas").innerHTML = "";
@@ -2248,7 +2461,7 @@ async function excluirProg(id){
   if(!confirm("Excluir esta programacao?")) return;
   load("excluindo...");
   try{ const r = await api("excluirProg",{id}); unload(); if(!r.ok) alert(r.erro);
-    await carregarProgramacoes(); renderProg();
+    await carregarProgramacoes(true); renderProg();
     if(!$("vw-lojas").classList.contains("hide")) renderLojas();
     if(!$("vw-dia").classList.contains("hide")) renderDia();
   }catch(e){ unload(); alert("Sem conexao."); }
@@ -2291,7 +2504,7 @@ $("prog-salvar").onclick = async () => {
     $("ov-progok").classList.remove("hide");
 
     // atualiza as listas em segundo plano (nao trava o feedback)
-    carregarProgramacoes().then(()=>{
+    carregarProgramacoes(true).then(()=>{
       if(!$("vw-lojas").classList.contains("hide")) renderLojas();
       if(!$("vw-prog").classList.contains("hide")) renderProg();
       if(!$("vw-dia").classList.contains("hide")) renderDia();
@@ -2300,7 +2513,10 @@ $("prog-salvar").onclick = async () => {
 };
 
 /* ---------- excel programacao ---------- */
-$("pg-excel").onclick = () => {
+$("pg-excel").onclick = async () => {
+  load("preparando Excel...");
+  try{ await garantirExcel(); }catch(e){ unload(); alert("Nao foi possivel carregar o exportador Excel."); return; }
+  unload();
   const ws = XLSX.utils.json_to_sheet(PROGRAMACOES.map(p=>({
     DATA:dtBR(p.dataProgramada), LOJA:p.loja, ENDERECO:p.endereco, CIDADE:p.cidade,
     ESTADO:p.estado, VENDEDOR:p.vendedor, ANOTACAO:p.anotacao
