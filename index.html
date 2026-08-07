@@ -504,7 +504,7 @@ function calcularNPS(lista){
 }
 function corNPS(v){ return v>=50?"#00FF88":v>=0?"#FFBB00":"#FF4D6A"; }
 
-let USER = null, CRED = null, RELATOS = [], ABERTOS = new Set(), DEL_ID = null;
+let USER = null, CRED = null, RELATOS = [], ABERTOS = new Set(), ABERTOS_HIST = new Set(), DEL_ID = null;
 let SELECIONADOS = new Set();
 let ULTIMA_CARGA = 0;
 let KPI_ABERTO = null;
@@ -759,6 +759,7 @@ async function entrar(){
     CRED = {email, senha};
     USER = r.usuario;
     localStorage.setItem("trade_cred", JSON.stringify(CRED));
+    localStorage.setItem("trade_user", JSON.stringify(USER));
     iniciar();
   }catch(e){ unload(); erroLogin("Sem conexao com o servidor."); }
 }
@@ -768,6 +769,7 @@ function erroLogin(msg){ $("li-erro").textContent = msg; $("li-erro").style.disp
 $("nv-sair").onclick = () => {
   limparCacheUsuario();
   localStorage.removeItem("trade_cred");
+  localStorage.removeItem("trade_user");
   limparDadosMemoria();
   CRED = null; USER = null;
   $("app").classList.add("hide"); $("login").classList.remove("hide");
@@ -1100,8 +1102,10 @@ function renderHist(){
     const cls = classeDe(r), nota = calcularNota(r);
     const c = r.analisado ? SC[cls] : "#8494AD";
     const pode = podeExcluir(r), sel = SELECIONADOS.has(r.id);
+    const hAb = ABERTOS_HIST.has(r.id);
     return `<div class="card" style="padding:14px 16px;border-left:3px solid ${c};margin-bottom:8px;
-      display:flex;gap:12px;align-items:flex-start;${sel?"background:rgba(0,229,255,.06);border-color:rgba(0,229,255,.35)":""}">
+      ${sel?"background:rgba(0,229,255,.06);border-color:rgba(0,229,255,.35)":""}">
+      <div style="display:flex;gap:12px;align-items:flex-start">
       ${pode ? `<input type="checkbox" style="width:16px;height:16px;padding:0;margin-top:2px;flex-shrink:0;
         accent-color:var(--cy);cursor:pointer" ${sel?"checked":""} onchange="alternaSel('${r.id}')">` : `<span style="width:16px;flex-shrink:0"></span>`}
       <div style="flex:1;min-width:0">
@@ -1114,12 +1118,17 @@ function renderHist(){
         ${r.loja ? `<div style="font-size:14px;font-weight:700;margin-top:4px">${esc(r.loja)}</div>` : ""}
         <div style="font-size:13px;color:var(--tx2);margin-top:4px;line-height:1.5">${esc(r.insights || r.textoOriginal.slice(0,120))}</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
-          ${r.oportunidades.map(o=>`<span style="padding:2px 7px;border-radius:4px;font-size:10px;background:rgba(0,255,136,.12);color:var(--gr)">+ ${esc(o)}</span>`).join("")}
-          ${r.perdas.map(p=>`<span style="padding:2px 7px;border-radius:4px;font-size:10px;background:rgba(255,77,106,.12);color:var(--rd)">! ${esc(p)}</span>`).join("")}
+          ${(r.oportunidades||[]).map(o=>`<span style="padding:2px 7px;border-radius:4px;font-size:10px;background:rgba(0,255,136,.12);color:var(--gr)">+ ${esc(o)}</span>`).join("")}
+          ${(r.perdas||[]).map(p=>`<span style="padding:2px 7px;border-radius:4px;font-size:10px;background:rgba(255,77,106,.12);color:var(--rd)">! ${esc(p)}</span>`).join("")}
         </div>
       </div>
-      ${pode ? `<button class="nav" style="font-size:10px;padding:4px 10px;flex-shrink:0"
-        onclick="pedirExcluir('${r.id}')">EXCLUIR</button>` : ""}
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        <button class="nav" style="padding:5px 9px;font-size:10px" onclick="alternaHist('${r.id}',this)" title="Ver relato">${hAb?"\u25B2":"\u25BC"}</button>
+        ${pode ? `<button class="nav" style="font-size:10px;padding:4px 10px"
+          onclick="pedirExcluir('${r.id}')">EXCLUIR</button>` : ""}
+      </div>
+      </div>
+      ${hAb ? '<div class="hist-corpo" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)">'+corpoRelato(r)+'</div>' : ""}
     </div>`;
   }).join("");
 }
@@ -1127,6 +1136,19 @@ function renderHist(){
 function alternaSel(id){
   SELECIONADOS.has(id) ? SELECIONADOS.delete(id) : SELECIONADOS.add(id);
   renderHist();
+}
+function alternaHist(id, el){
+  ABERTOS_HIST.has(id) ? ABERTOS_HIST.delete(id) : ABERTOS_HIST.add(id);
+  const ab = ABERTOS_HIST.has(id);
+  const r = RELATOS.find(x=>x.id===id); if(!r) return;
+  const card = el && el.closest('.card');
+  if(!card) return;
+  el.textContent = ab ? '\u25B2' : '\u25BC';
+  let zona = card.querySelector('.hist-corpo');
+  if(ab){
+    if(!zona){ zona = document.createElement('div'); zona.className='hist-corpo'; zona.style.cssText='margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)'; card.appendChild(zona); }
+    zona.innerHTML = corpoRelato(r);
+  } else if(zona){ zona.remove(); }
 }
 function limparSel(){ SELECIONADOS.clear(); renderHist(); }
 
@@ -1492,29 +1514,32 @@ function renderRel(){
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
           <span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}44">${ROTULO[cls]} · NOTA ${nota.toFixed(1)}</span>
-          <button class="nav" style="padding:5px 9px;font-size:10px" onclick="alterna('${r.id}')">${ab?"▲":"▼"}</button>
+          <button class="nav" style="padding:5px 9px;font-size:10px" onclick="alterna('${r.id}',this)">${ab?"\u25B2":"\u25BC"}</button>
         </div>
       </div>
-      ${ab ? corpoRelato(r) : ""}
+      ${ab ? '<div class="rel-corpo">'+corpoRelato(r)+'</div>' : ""}
     </div>`;
   }).join("");
 }
 
 function corpoRelato(r){
+  const oport = Array.isArray(r.oportunidades) ? r.oportunidades : [];
+  const perdas = Array.isArray(r.perdas) ? r.perdas : [];
+  const prods = Array.isArray(r.produtos) ? r.produtos : [];
+  const concs = Array.isArray(r.concorrentes) ? r.concorrentes : [];
   const bloco = (t,itens,cor,ic) => !itens.length ? "" :
     `<div><div style="font-size:10px;font-weight:700;color:${cor};letter-spacing:.06em;margin-bottom:5px">${ic} ${t}</div>
      ${itens.map(i=>`<div style="font-size:13px;padding-left:10px;margin-bottom:4px;border-left:2px solid ${cor}55;line-height:1.4">${esc(i)}</div>`).join("")}</div>`;
   return `
-    <p style="font-size:14px;color:var(--tx2);line-height:1.6;margin:10px 0 14px;font-style:italic">${esc(r.insights)}</p>
+    ${r.insights ? `<p style="font-size:14px;color:var(--tx2);line-height:1.6;margin:10px 0 14px;font-style:italic">${esc(r.insights)}</p>` : ""}
     <div class="grid2" style="margin-bottom:12px">
-      ${bloco("OPORTUNIDADES", r.oportunidades, "#00FF88", "+")}
-      ${bloco("PERDAS / PROBLEMAS", r.perdas, "#FF4D6A", "!")}
-      ${bloco("INSIGHTS", r.insights, "#00E5FF", "*")}
-      ${bloco("PRODUTOS / MIX", r.produtos, "#8B5CF6", "#")}
+      ${bloco("OPORTUNIDADES", oport, "#00FF88", "+")}
+      ${bloco("PERDAS / PROBLEMAS", perdas, "#FF4D6A", "!")}
+      ${bloco("PRODUTOS / MIX", prods, "#8B5CF6", "#")}
     </div>
-    ${r.concorrentes.length ? `<div style="margin-bottom:12px;padding:8px 12px;border-radius:6px;
+    ${concs.length ? `<div style="margin-bottom:12px;padding:8px 12px;border-radius:6px;
       background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.25);font-size:13px;color:var(--tx2)">
-      <b style="color:var(--or);font-size:10px;letter-spacing:.06em">CONCORRENTES</b> ${r.concorrentes.map(esc).join("  /  ")}</div>` : ""}
+      <b style="color:var(--or);font-size:10px;letter-spacing:.06em">CONCORRENTES</b> ${concs.map(esc).join("  /  ")}</div>` : ""}
     ${r.acaoSugerida ? `<div style="padding:12px 14px;border-radius:8px;background:rgba(255,187,0,.08);
       border:1px solid rgba(255,187,0,.3)"><span style="font-size:10px;font-weight:700;color:var(--am);letter-spacing:.06em">ACAO SUGERIDA</span>
       <p style="margin:6px 0 0;font-size:14px;line-height:1.5">${esc(r.acaoSugerida)}</p></div>` : ""}
@@ -1522,7 +1547,20 @@ function corpoRelato(r){
       border:1px solid var(--bd);font-size:12px;color:var(--tx3);line-height:1.6;white-space:pre-wrap">${esc(r.textoOriginal)}</div>`;
 }
 
-function alterna(id){ ABERTOS.has(id) ? ABERTOS.delete(id) : ABERTOS.add(id); renderRel(); }
+function alterna(id, el){
+  ABERTOS.has(id) ? ABERTOS.delete(id) : ABERTOS.add(id);
+  const ab = ABERTOS.has(id);
+  const r = RELATOS.find(x=>x.id===id); if(!r) return;
+  const card = el && el.closest('.card');
+  if(!card) return;
+  el.textContent = ab ? '\u25B2' : '\u25BC';
+  card.style.padding = ab ? '18px 20px' : '14px 16px';
+  let zona = card.querySelector('.rel-corpo');
+  if(ab){
+    if(!zona){ zona = document.createElement('div'); zona.className='rel-corpo'; card.appendChild(zona); }
+    zona.innerHTML = corpoRelato(r);
+  } else if(zona){ zona.remove(); }
+}
 
 /* ---------- GRAFICOS ---------- */
 function desenharGraficos(F){
@@ -2593,18 +2631,51 @@ function renderDia(){
     `<div class="mono" style="text-align:center;padding:50px;color:var(--tx3);font-size:13px">// nenhuma visita programada</div>`;
 }
 
-/* ---------- SESSAO SALVA ---------- */
+/* ---------- SESSAO SALVA (otimizada: cache-first, login em background) ---------- */
 (async function(){
   const s = localStorage.getItem("trade_cred");
   if(!s) return;
   try{
     CRED = JSON.parse(s);
-    load("entrando...");
-    const r = await api("login");   // login devolve o usuario
-    unload();
-    if(r.ok && r.usuario){ USER = r.usuario; iniciar(); }
-    else { localStorage.removeItem("trade_cred"); CRED = null; }
-  }catch(e){ unload(); CRED = null; }
+    // tenta hidratar do cache e mostrar o app INSTANTANEAMENTE
+    const userCache = localStorage.getItem("trade_user");
+    const tinhaCache = hidratarCache();
+    if(userCache && tinhaCache){
+      try{
+        USER = JSON.parse(userCache);
+        $("login").classList.add("hide");
+        $("app").classList.remove("hide");
+        $("hd-nome").textContent = USER.nome;
+        const adm = USER.role === "admin";
+        $("hd-role").textContent = adm ? "ADMINISTRADORA" : "VENDEDOR";
+        $("hd-role").style.color = adm ? "var(--am)" : "var(--tx3)";
+        $("fm-vend").textContent = USER.nome;
+        $("ft-excel").classList.toggle("hide", !adm);
+        populaFmUF(); renderPendentes(); renderHist();
+      }catch(e){ /* fallback abaixo */ }
+    }
+    // login em background (nao bloqueia a tela)
+    const jaAbriu = !$("app").classList.contains("hide");
+    if(!jaAbriu) load("entrando...");
+    const r = await api("login");
+    if(!jaAbriu) unload();
+    if(r.ok && r.usuario){
+      USER = r.usuario;
+      localStorage.setItem("trade_user", JSON.stringify(USER));
+      if(!jaAbriu) iniciar();
+      else{ atualizarDatasets(["clientes","relatos"]).then(redesenharVisivel); }
+    } else {
+      localStorage.removeItem("trade_cred");
+      localStorage.removeItem("trade_user");
+      CRED = null; USER = null;
+      $("app").classList.add("hide"); $("login").classList.remove("hide");
+    }
+  }catch(e){
+    // sem rede: se ja abriu do cache, segue; senao mostra login
+    if($("app").classList.contains("hide")){
+      unload(); CRED = null;
+    }
+  }
 })();
 </script>
 </body>
