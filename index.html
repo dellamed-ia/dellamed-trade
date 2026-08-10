@@ -199,6 +199,16 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
         <label class="lbl">Relato da visita</label>
         <textarea id="fm-texto" rows="5" style="resize:vertical;line-height:1.6"
           placeholder="Escreva livremente: qual loja visitou, como estavam os produtos Dellamed, concorrentes, oportunidades, problemas..."></textarea>
+        <div style="margin-top:14px">
+          <label class="lbl">Nota da visita <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(0 a 10)</span></label>
+          <select id="fm-nota" style="max-width:160px">
+            <option value="">Selecione...</option>
+            <option value="0">0</option><option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option><option value="5">5</option>
+            <option value="6">6</option><option value="7">7</option><option value="8">8</option>
+            <option value="9">9</option><option value="10">10</option>
+          </select>
+        </div>
         <button id="fm-enviar" class="btn" style="margin-top:14px">ENVIAR</button>
       </div>
       <div id="pendentes" style="margin-top:22px"></div>
@@ -224,9 +234,9 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
         <div><label class="lbl" style="font-size:10px">Ate</label><input id="ft-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
         <div><label class="lbl" style="font-size:10px">Vendedor</label><select id="ft-vend" style="padding:7px 10px;font-size:13px"></select></div>
         <div><label class="lbl" style="font-size:10px">Estado</label><select id="ft-uf" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Classificacao</label><select id="ft-sent" style="padding:7px 10px;font-size:13px">
-          <option value="">Todas</option><option value="promotor">Promotor</option>
-          <option value="passivo">Passivo</option><option value="detrator">Detrator</option></select></div>
+        <div><label class="lbl" style="font-size:10px">Faixa de nota</label><select id="ft-sent" style="padding:7px 10px;font-size:13px">
+          <option value="">Todas</option><option value="alta">Alta (7-10)</option>
+          <option value="media">Média (4-6)</option><option value="baixa">Baixa (0-3)</option></select></div>
         <div style="position:relative"><label class="lbl" style="font-size:10px">Segmento</label>
           <button class="nav" id="ft-seg-btn" style="padding:7px 10px;font-size:13px;min-width:120px;text-align:left">Todos ▾</button>
           <div id="ft-seg-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;margin-top:4px;
@@ -266,7 +276,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
       <div id="insights-nps" style="margin-bottom:16px"></div>
       <div class="grid2" style="margin-bottom:16px">
         <div class="card" style="padding:16px">
-          <h4 style="margin:0 0 12px;font-size:12px;color:var(--tx2);letter-spacing:.06em">CLASSIFICACAO NPS</h4>
+          <h4 style="margin:0 0 12px;font-size:12px;color:var(--tx2);letter-spacing:.06em">DISTRIBUICAO POR NOTA</h4>
           <div class="chartbox"><canvas id="ch1"></canvas></div>
           <div id="faixas-info" style="margin-top:14px"></div>
         </div>
@@ -274,7 +284,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
             <h4 style="margin:0;font-size:12px;color:var(--tx2);letter-spacing:.06em">MAPA DE CALOR</h4>
             <div style="display:flex;gap:6px">
-              <button class="nav on" id="mp-nps" style="font-size:10px;padding:4px 10px">NPS</button>
+              <button class="nav on" id="mp-nps" style="font-size:10px;padding:4px 10px">NOTA</button>
               <button class="nav" id="mp-vis" style="font-size:10px;padding:4px 10px">VISITAS</button>
             </div>
           </div>
@@ -458,51 +468,51 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 const API_URL = "https://script.google.com/macros/s/AKfycbwQFcI-LCFBocbTVBviuKh9sigEOlyA90eIxUjl9_4-k57uw8erXZA-TYNXiRq5U4k8EQ/exec";
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
-const SC = {promotor:"#00FF88", passivo:"#FFBB00", detrator:"#FF4D6A"};
-const ROTULO = {promotor:"PROMOTOR", passivo:"PASSIVO", detrator:"DETRATOR"};
+const SC = {alta:"#00FF88", media:"#FFBB00", baixa:"#FF4D6A"};
+const ROTULO = {alta:"ALTA", media:"MÉDIA", baixa:"BAIXA"};
 
 /* ============================================================
-   NOTA DA LOJA (0 a 10) + CLASSIFICACAO NPS
-   Regra fixa, mesma para todos: mesmo relato = mesma nota.
+   NOTA DA VISITA (0 a 10) — sem NPS
+   A nota e a que o vendedor deu na hora da visita (r.nota).
+   Relatos antigos, sem nota, usam a formula anterior como fallback
+   (base 5 + oportunidades -perdas -concorrentes) para nao ficarem vazios.
 
-     Base neutra .................... 5,0
-     Cada oportunidade .............. +1,5
-     Cada perda / problema .......... -2,0
-     Cada concorrente citado ........ -0,5
-   Resultado limitado entre 0 e 10.
-
-   Faixas NPS (padrao de mercado):
-     9 a 10 -> PROMOTOR
-     7 a 8  -> PASSIVO
-     0 a 6  -> DETRATOR
-
-   Indicador NPS = % promotores - % detratores  (escala -100 a +100)
+   Faixas por nota:
+     7 a 10 -> ALTA
+     4 a 6  -> MEDIA
+     0 a 3  -> BAIXA
+   O indicador principal e a NOTA MEDIA do conjunto (0 a 10).
    ============================================================ */
 const PESO = {base:5, oportunidade:1.5, perda:-2.0, concorrente:-0.5};
-const CORTE = {promotor:9, passivo:7};
 
+function temNotaReal(r){
+  return r && r.nota !== undefined && r.nota !== null && r.nota !== "" && !isNaN(Number(r.nota));
+}
 function calcularNota(r){
+  if(temNotaReal(r)){
+    return Math.round(Math.max(0, Math.min(10, Number(r.nota))) * 10) / 10;
+  }
+  // fallback: relatos antigos sem nota registrada
   const n = PESO.base
     + PESO.oportunidade * (r.oportunidades||[]).length
     + PESO.perda        * (r.perdas||[]).length
     + PESO.concorrente  * (r.concorrentes||[]).length;
   return Math.round(Math.max(0, Math.min(10, n)) * 10) / 10;
 }
-function classificar(nota){
-  return nota >= CORTE.promotor ? "promotor" : nota >= CORTE.passivo ? "passivo" : "detrator";
-}
-function classeDe(r){ return classificar(calcularNota(r)); }
+function faixaDe(nota){ return nota >= 7 ? "alta" : nota >= 4 ? "media" : "baixa"; }
+function classeDe(r){ return faixaDe(calcularNota(r)); }
+function corNota(nota){ return nota >= 7 ? "#00FF88" : nota >= 4 ? "#FFBB00" : "#FF4D6A"; }
 
-// NPS de um conjunto: % promotores - % detratores
-function calcularNPS(lista){
-  if(!lista.length) return {nps:0,promotores:0,passivos:0,detratores:0,total:0,pctP:0,pctN:0,pctPass:0};
-  let p=0,n=0,pass=0;
-  lista.forEach(r=>{ const c=classeDe(r); if(c==="promotor")p++; else if(c==="detrator")n++; else pass++; });
-  const t=lista.length, pctP=p/t*100, pctN=n/t*100, pctPass=pass/t*100;
-  return {nps:Math.round(pctP-pctN), promotores:p, passivos:pass, detratores:n, total:t,
-          pctP:Math.round(pctP), pctN:Math.round(pctN), pctPass:Math.round(pctPass)};
+// estatisticas de nota de um conjunto (media + distribuicao por faixa)
+function estatNotas(lista){
+  if(!lista.length) return {total:0, nAlta:0, nMedia:0, nBaixa:0, mediaNota:0, pctAlta:0, pctMedia:0, pctBaixa:0};
+  let nAlta=0, nMedia=0, nBaixa=0, soma=0;
+  lista.forEach(r=>{ const n=calcularNota(r); soma+=n; const f=faixaDe(n);
+    if(f==="alta")nAlta++; else if(f==="media")nMedia++; else nBaixa++; });
+  const t=lista.length;
+  return {total:t, nAlta, nMedia, nBaixa, mediaNota: soma/t,
+          pctAlta:Math.round(nAlta/t*100), pctMedia:Math.round(nMedia/t*100), pctBaixa:Math.round(nBaixa/t*100)};
 }
-function corNPS(v){ return v>=50?"#00FF88":v>=0?"#FFBB00":"#FF4D6A"; }
 
 let USER = null, CRED = null, RELATOS = [], ABERTOS = new Set(), ABERTOS_HIST = new Set(), DEL_ID = null;
 let SELECIONADOS = new Set();
@@ -994,7 +1004,9 @@ function isoParaBR(iso){
 
 $("fm-enviar").onclick = async () => {
   const uf = $("fm-uf").value, dt = isoParaBR($("fm-data").value), tx = $("fm-texto").value.trim();
+  const nota = $("fm-nota").value;
   if(!uf || !dt || !tx){ alert("Preencha estado, data e o relato."); return; }
+  if(nota === ""){ alert("Informe a nota da visita (0 a 10)."); return; }
   let loja="", cidade="", endereco="";
   const loSel = $("fm-loja").value, enSel = $("fm-end").value;
   if(loSel){
@@ -1005,10 +1017,10 @@ $("fm-enviar").onclick = async () => {
   }
   load("enviando e analisando...");
   try{
-    const r = await api("criar", {estado:uf, dataVisita:dt, texto:tx, loja, cidade, endereco});
+    const r = await api("criar", {estado:uf, dataVisita:dt, texto:tx, loja, cidade, endereco, nota});
     unload();
     if(!r.ok){ alert(r.erro || "Falha ao enviar."); return; }
-    $("fm-texto").value = "";
+    $("fm-texto").value = ""; $("fm-nota").value = "";
     $("fm-loja").value = ""; $("fm-loja-busca").value = ""; $("fm-end-wrap").style.display = "none"; $("fm-end-info").style.display = "none";
     $("fm-cnpj").value = ""; $("fm-cnpj-msg").style.display = "none";
     $("ov-ok").classList.remove("hide");
@@ -1279,7 +1291,7 @@ function atualizaBtnMulti(btnId, setRef, rotuloVazio){
 }
 
 $("mp-nps").onclick = () => {
-  MAPA_METRICA = "nps";
+  MAPA_METRICA = "nota";
   $("mp-nps").className = "nav on"; $("mp-vis").className = "nav";
   $("mp-nps").style.cssText = "font-size:10px;padding:5px 12px";
   $("mp-vis").style.cssText = "font-size:10px;padding:5px 12px";
@@ -1433,23 +1445,19 @@ function renderRel(){
 
   const notas = F.map(calcularNota);
   const media = notas.length ? (notas.reduce((a,b)=>a+b,0)/notas.length) : 0;
-  const R = calcularNPS(F);
-  const cNPS = corNPS(R.nps);
+  const R = estatNotas(F);
+  const cMedia = corNota(media);
 
   $("legenda").innerHTML = `
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;width:100%">
       <div style="display:flex;align-items:baseline;gap:6px;padding-right:14px;border-right:1px solid var(--bd)">
-        <span style="font-size:10px;color:var(--tx3);letter-spacing:.06em">NPS</span>
-        <span style="font-size:22px;font-weight:800;color:${cNPS};line-height:1">${R.nps > 0 ? "+" : ""}${R.nps}</span>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:5px;padding-right:14px;border-right:1px solid var(--bd)">
-        <span style="font-size:10px;color:var(--tx3);letter-spacing:.06em">NOTA</span>
-        <span style="font-size:15px;font-weight:700;color:var(--tx)">${media.toFixed(1)}</span>
+        <span style="font-size:10px;color:var(--tx3);letter-spacing:.06em">NOTA MÉDIA</span>
+        <span style="font-size:22px;font-weight:800;color:${cMedia};line-height:1">${media.toFixed(1)}</span>
         <span style="font-size:10px;color:var(--tx3)">/10</span>
       </div>
-      ${[["PROMOTOR",R.promotores,SC.promotor,"9-10",R.pctP],
-         ["PASSIVO",R.passivos,SC.passivo,"7-8",R.pctPass],
-         ["DETRATOR",R.detratores,SC.detrator,"0-6",R.pctN]].map(([t,n,c,faixa,pct]) => `
+      ${[["ALTA",R.nAlta,SC.alta,"7-10",R.pctAlta],
+         ["MÉDIA",R.nMedia,SC.media,"4-6",R.pctMedia],
+         ["BAIXA",R.nBaixa,SC.baixa,"0-3",R.pctBaixa]].map(([t,n,c,faixa,pct]) => `
         <span style="display:flex;align-items:center;gap:6px;font-size:11px">
           <span style="width:9px;height:9px;border-radius:50%;background:${c}"></span>
           <b style="color:${c};letter-spacing:.04em">${t}</b>
@@ -1458,18 +1466,16 @@ function renderRel(){
         </span>`).join("")}
       <button onclick="$('criterio').classList.toggle('hide')"
         style="background:none;border:1px solid var(--bd);border-radius:5px;color:var(--tx3);
-        cursor:pointer;font-size:10px;padding:3px 9px;margin-left:auto">COMO FUNCIONA O NPS</button>
+        cursor:pointer;font-size:10px;padding:3px 9px;margin-left:auto">COMO FUNCIONA A NOTA</button>
     </div>
 
     <div id="criterio" class="hide" style="width:100%;margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)">
       <div style="font-size:12px;color:var(--tx2);line-height:1.6;margin-bottom:12px">
-        Cada visita recebe uma <b>nota de 0 a 10</b>. Toda loja comeca em <b>5,0</b>:
-        <span style="color:var(--gr)">cada oportunidade +1,5</span>,
-        <span style="color:var(--rd)">cada perda −2,0</span>,
-        <span style="color:var(--or)">cada concorrente −0,5</span>.
+        Cada visita recebe uma <b>nota de 0 a 10</b> dada pelo vendedor no momento do registro.
+        O indicador acima é a <b>nota média</b> do período filtrado. As faixas abaixo agrupam as visitas por nota.
       </div>
       <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--bd);margin-bottom:12px">
-        ${[["0 – 6","DETRATOR",SC.detrator,7],["7 – 8","PASSIVO",SC.passivo,2],["9 – 10","PROMOTOR",SC.promotor,2]]
+        ${[["0 – 3","BAIXA",SC.baixa,4],["4 – 6","MÉDIA",SC.media,3],["7 – 10","ALTA",SC.alta,4]]
           .map(([faixa,nome,cor,peso]) => `
           <div style="flex:${peso};text-align:center;padding:10px 6px;background:${cor}12;border-right:1px solid var(--bd)">
             <div style="font-size:16px;font-weight:800;color:${cor}">${faixa}</div>
@@ -1477,9 +1483,9 @@ function renderRel(){
           </div>`).join("")}
       </div>
       <div style="text-align:center;font-size:12px;color:var(--tx2);padding:9px;
-        background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.25);border-radius:8px">
-        <b style="color:var(--or)">NPS</b> = % PROMOTORAS − % DETRATORAS
-        <span style="color:var(--tx3)">· escala −100 a +100 · passivos nao entram na conta</span>
+        background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.25);border-radius:8px">
+        <b style="color:var(--cy)">NOTA MÉDIA</b> = média das notas das visitas do período
+        <span style="color:var(--tx3)">· escala 0 a 10</span>
       </div>
     </div>`;
 
@@ -1573,10 +1579,10 @@ function desenharGraficos(F){
     scales:{x:{ticks:{color:"#8494AD",font:{size:10}},grid:{color:"#1E2A3A"}},
             y:{ticks:{color:"#8494AD",font:{size:10}},grid:{color:"#1E2A3A"},beginAtZero:true}}};
 
-  const sent = ["promotor","passivo","detrator"].map(s => F.filter(r=>classeDe(r)===s).length);
+  const sent = ["alta","media","baixa"].map(s => F.filter(r=>classeDe(r)===s).length);
   charts.c1 = new Chart($("ch1"), {type:"doughnut",
-    data:{labels:["Promotor","Passivo","Detrator"],
-      datasets:[{data:sent,backgroundColor:[SC.promotor,SC.passivo,SC.detrator],borderWidth:0}]},
+    data:{labels:["Alta (7-10)","Média (4-6)","Baixa (0-3)"],
+      datasets:[{data:sent,backgroundColor:[SC.alta,SC.media,SC.baixa],borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:"58%",
       animation:false, resizeDelay:120,
       plugins:{legend:{position:"bottom",labels:{color:"#B8C4D9",font:{size:11},padding:12,boxWidth:12}}}}});
@@ -1584,7 +1590,7 @@ function desenharGraficos(F){
   // painel de faixas
   $("faixas-info").innerHTML = `
     <div style="display:flex;flex-direction:column;gap:8px">
-      ${[["PROMOTOR","9 e 10","#00FF88"],["PASSIVO","7 e 8","#FFBB00"],["DETRATOR","0 a 6","#FF4D6A"]].map(([t,f,c])=>`
+      ${[["ALTA","7 a 10","#00FF88"],["MÉDIA","4 a 6","#FFBB00"],["BAIXA","0 a 3","#FF4D6A"]].map(([t,f,c])=>`
         <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;
           background:${c}10;border:1px solid ${c}30">
           <span style="width:11px;height:11px;border-radius:50%;background:${c};box-shadow:0 0 8px ${c}66"></span>
@@ -1592,7 +1598,7 @@ function desenharGraficos(F){
           <span style="font-size:12px;color:var(--tx2)">nota ${f}</span>
         </div>`).join("")}
       <div style="font-size:11px;color:var(--tx3);line-height:1.6;margin-top:4px">
-        A nota comeca em 5,0 · cada oportunidade +1,5 · cada perda −2,0 · cada concorrente −0,5
+        Nota de 0 a 10 informada pelo vendedor em cada visita
       </div>
     </div>`;
 
@@ -1616,8 +1622,8 @@ function desenharGraficos(F){
   });
   charts.c3 = new Chart($("ch3"), {type:"line",
     data:{labels:dias,datasets:[
-      {label:"Oportunidades",data:dias.map(d=>md[d].o),borderColor:SC.promotor,backgroundColor:SC.promotor,tension:.3},
-      {label:"Perdas",data:dias.map(d=>md[d].p),borderColor:SC.detrator,backgroundColor:SC.detrator,tension:.3}]},
+      {label:"Oportunidades",data:dias.map(d=>md[d].o),borderColor:SC.alta,backgroundColor:SC.alta,tension:.3},
+      {label:"Perdas",data:dias.map(d=>md[d].p),borderColor:SC.baixa,backgroundColor:SC.baixa,tension:.3}]},
     options:base});
 
   const mc = {}; F.forEach(r => r.concorrentes.forEach(c => mc[c] = (mc[c]||0)+1));
@@ -1642,7 +1648,7 @@ const REGIOES = {
   SUL:            {cor:"#00FF88", ufs:["PR","SC","RS"]}
 };
 const UF_REGIAO = MAPA_BR.r;
-let MAPA_METRICA = "nps";
+let MAPA_METRICA = "nota";
 
 function renderMapa(F){
   const porUF = {};
@@ -1655,11 +1661,11 @@ function renderMapa(F){
   const valor = uf => {
     const lista = porUF[uf];
     if(!lista || !lista.length) return null;
-    return MAPA_METRICA === "nps" ? calcularNPS(lista).nps : lista.length;
+    return MAPA_METRICA === "nota" ? Math.round(estatNotas(lista).mediaNota*10)/10 : lista.length;
   };
   const corDe = v => {
     if(v === null) return "#141B26";
-    if(MAPA_METRICA === "nps") return corNPS(v);
+    if(MAPA_METRICA === "nota") return corNota(v);
     const a = 0.25 + (v/maxVis) * 0.75;
     return `rgba(0,229,255,${a.toFixed(2)})`;
   };
@@ -1675,7 +1681,7 @@ function renderMapa(F){
     svg += `<path d="${MAPA_BR.p[uf]}" fill="${cor}" stroke="${stroke}" stroke-width="${sw}"
       style="cursor:${tem?'pointer':'default'};transition:fill .2s"
       ${tem?`onclick="filtrarUF('${uf}')"`:''}>
-      <title>${uf}${tem?" · "+(MAPA_METRICA==="nps"?"NPS "+(v>0?"+"+v:v):v+" visitas"):" · sem visita"}</title>
+      <title>${uf}${tem?" · "+(MAPA_METRICA==="nota"?"Nota "+v.toFixed(1):v+" visitas"):" · sem visita"}</title>
     </path>`;
   });
 
@@ -1683,12 +1689,12 @@ function renderMapa(F){
   estados.forEach(uf => {
     const v = valor(uf); if(v === null) return;
     const [cx,cy] = MAPA_BR.c[uf];
-    const claro = MAPA_METRICA==="nps" ? true : (v/maxVis > 0.55);
+    const claro = MAPA_METRICA==="nota" ? true : (v/maxVis > 0.55);
     const tc = claro ? "#0A1224" : "#DCE6F5";
     svg += `<text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="12" font-weight="800"
       fill="${tc}" font-family="Inter,sans-serif" pointer-events="none">${uf}</text>
       <text x="${cx}" y="${cy+11}" text-anchor="middle" font-size="10.5" font-weight="700"
-      fill="${tc}" font-family="Inter,sans-serif" pointer-events="none">${MAPA_METRICA==="nps"?(v>0?"+"+v:v):v}</text>`;
+      fill="${tc}" font-family="Inter,sans-serif" pointer-events="none">${MAPA_METRICA==="nota"?v.toFixed(1):v}</text>`;
   });
   svg += `</svg>`;
 
@@ -1696,8 +1702,8 @@ function renderMapa(F){
   const regResumo = Object.entries(REGIOES).map(([reg,o]) => {
     const lista = F.filter(r => UF_REGIAO[(r.estado||"").toUpperCase()] === reg);
     if(!lista.length) return null;
-    const val = MAPA_METRICA==="nps" ? calcularNPS(lista).nps : lista.length;
-    const rotulo = MAPA_METRICA==="nps" ? (val>0?"+"+val:val) : val+(val===1?" visita":" visitas");
+    const val = MAPA_METRICA==="nota" ? (Math.round(estatNotas(lista).mediaNota*10)/10) : lista.length;
+    const rotulo = MAPA_METRICA==="nota" ? ("nota "+val.toFixed(1)) : val+(val===1?" visita":" visitas");
     return `<span style="display:flex;align-items:center;gap:6px;font-size:11px">
       <span style="width:10px;height:10px;border-radius:3px;background:${o.cor}"></span>
       <b style="color:${o.cor}">${reg}</b>
@@ -1705,11 +1711,11 @@ function renderMapa(F){
   }).filter(Boolean).join("");
 
   let escala;
-  if(MAPA_METRICA==="nps"){
+  if(MAPA_METRICA==="nota"){
     escala = `<div style="display:flex;gap:14px;justify-content:center;margin-top:6px;flex-wrap:wrap;font-size:11px">
-      <span style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:#FF4D6A"></span><span style="color:var(--tx2)">negativo</span></span>
-      <span style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:#FFBB00"></span><span style="color:var(--tx2)">0 a 49</span></span>
-      <span style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:#00FF88"></span><span style="color:var(--tx2)">50+</span></span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:#FF4D6A"></span><span style="color:var(--tx2)">0 a 3</span></span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:#FFBB00"></span><span style="color:var(--tx2)">4 a 6</span></span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:#00FF88"></span><span style="color:var(--tx2)">7 a 10</span></span>
       <span style="display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:#141B26;border:1px solid #2A3547"></span><span style="color:var(--tx3)">sem visita</span></span>
     </div>`;
   } else {
@@ -1791,19 +1797,18 @@ $("ft-excel").onclick = async () => {
   // Dashboard
   const barra = (v,mx) => mx ? "█".repeat(Math.max(1,Math.round(v/mx*20))) : "";
   const cont = c => F.reduce((s,r)=>s+r[c].length,0);
-  const RX = calcularNPS(F);
+  const RX = estatNotas(F);
   const notasX = F.map(calcularNota);
   const mediaX = notasX.length ? (notasX.reduce((a,b)=>a+b,0)/notasX.length).toFixed(1) : "0";
   const D = [["TRADE INTELLIGENCE // DELLAMED"],["Gerado em "+hoje],
     ["Vendedor: "+($("ft-vend").value||"Todos")+"   |   Estado: "+($("ft-uf").value||"Todos")],[],
-    ["NPS (% promotores - % detratores)", (RX.nps>0?"+":"")+RX.nps],
     ["Nota media (0 a 10)", mediaX],[],
     ["INDICADORES"],["Visitas","Lojas","Estados","Oportunidades","Perdas"],
     [F.length,contarUnicos(F.map(r=>r.loja)),contarUnicos(F.map(r=>r.estado),"estado"),cont("oportunidades"),cont("perdas")],[],
-    ["CLASSIFICACAO NPS"],["Classificacao","Lojas","%","Distribuicao"]];
-  const sent = ["promotor","passivo","detrator"].map(s=>[s,F.filter(r=>classeDe(r)===s).length]);
-  const mxS = Math.max(...sent.map(s=>s[1]),1);
-  sent.forEach(([s,n]) => D.push([s,n,F.length?Math.round(n/F.length*100)+"%":"0%",barra(n,mxS)]));
+    ["DISTRIBUICAO POR NOTA"],["Faixa","Visitas","%","Distribuicao"]];
+  const faixas = [["Alta (7-10)",RX.nAlta],["Média (4-6)",RX.nMedia],["Baixa (0-3)",RX.nBaixa]];
+  const mxS = Math.max(...faixas.map(s=>s[1]),1);
+  faixas.forEach(([s,n]) => D.push([s,n,F.length?Math.round(n/F.length*100)+"%":"0%",barra(n,mxS)]));
   D.push([],["VISITAS POR VENDEDOR"],["Vendedor","Visitas","%","Distribuicao"]);
   const mvMap=new Map(); F.forEach(r=>{const k=chaveFiltro(r.vendedor);if(!k)return;if(!mvMap.has(k))mvMap.set(k,{nome:r.vendedor,total:0});mvMap.get(k).total++;});
   const mv=[...mvMap.values()];
@@ -1820,7 +1825,7 @@ $("ft-excel").onclick = async () => {
   // Relatos
   const ws1 = XLSX.utils.json_to_sheet(F.map(r => ({
     "DATA":dtBR(r.data),"VENDEDOR":r.vendedor,"ESTADO":r.estado,"CIDADE":r.cidade,"LOJA":r.loja,
-    "NOTA":calcularNota(r),"CLASSIFICACAO":ROTULO[classeDe(r)],"RESUMO":r.insights,
+    "NOTA":calcularNota(r),"FAIXA":ROTULO[classeDe(r)],"RESUMO":r.insights,
     "OPORTUNIDADES":j(r.oportunidades),"PERDAS/PROBLEMAS":j(r.perdas),"INSIGHTS":j(r.insights),
     "PRODUTOS/MIX":j(r.produtos),"CONCORRENTES":j(r.concorrentes),
     "ACAO SUGERIDA":r.acaoSugerida,"RELATO ORIGINAL":r.textoOriginal
@@ -1879,7 +1884,7 @@ function esc(s){
 })();
 
 /* ============================================================
-   INSIGHTS NPS (KPIs clicaveis) + POPUPS
+   INSIGHTS (KPIs clicaveis) + POPUPS
    ============================================================ */
 function renderInsights(F){
   const el = $("insights-nps");
@@ -1887,12 +1892,12 @@ function renderInsights(F){
 
   const porUF = {};
   F.forEach(r => { (porUF[r.estado]=porUF[r.estado]||[]).push(r); });
-  const ufsNPS = Object.entries(porUF).map(([uf,l])=>[uf,calcularNPS(l).nps]).sort((a,b)=>a[1]-b[1]);
-  const menorUF = ufsNPS.length ? ufsNPS[0] : null;
+  const ufsNota = Object.entries(porUF).map(([uf,l])=>[uf, Math.round(estatNotas(l).mediaNota*10)/10]).sort((a,b)=>a[1]-b[1]);
+  const menorUF = ufsNota.length ? ufsNota[0] : null;
 
   const porLoja = {};
   F.forEach(r => { if(r.loja){ const k=chaveFiltro(r.loja); if(!porLoja[k]) porLoja[k]={nome:r.loja,itens:[]}; porLoja[k].itens.push(r); } });
-  const lojasNPS = Object.values(porLoja).map(x=>[x.nome,calcularNPS(x.itens).nps]).sort((a,b)=>a[1]-b[1]);
+  const lojasNota = Object.values(porLoja).map(x=>[x.nome, Math.round(estatNotas(x.itens).mediaNota*10)/10]).sort((a,b)=>a[1]-b[1]);
 
   const ultima = [...F].sort((a,b)=>new Date(b.data)-new Date(a.data))[0];
 
@@ -1904,14 +1909,14 @@ function renderInsights(F){
     </div>`;
 
   el.innerHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap">
-    ${menorUF ? card("menorEstado","ESTADO COM MENOR NPS",SC.detrator,
-      `<div style="font-size:20px;font-weight:800;color:${corNPS(menorUF[1])}">${esc(menorUF[0])}
-        <span style="font-size:14px">${menorUF[1]>0?"+":""}${menorUF[1]}</span></div>`) : ""}
-    ${card("menorLojas","LOJAS COM MENOR NPS",SC.detrator,
-      lojasNPS.length ? lojasNPS.slice(0,3).map(([l,n])=>
+    ${menorUF ? card("menorEstado","ESTADO COM MENOR NOTA",SC.baixa,
+      `<div style="font-size:20px;font-weight:800;color:${corNota(menorUF[1])}">${esc(menorUF[0])}
+        <span style="font-size:14px">${menorUF[1].toFixed(1)}</span></div>`) : ""}
+    ${card("menorLojas","LOJAS COM MENOR NOTA",SC.baixa,
+      lojasNota.length ? lojasNota.slice(0,3).map(([l,n])=>
         `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px">
           <span style="color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">${esc(l)}</span>
-          <b style="color:${corNPS(n)}">${n>0?"+":""}${n}</b></div>`).join("")
+          <b style="color:${corNota(n)}">${n.toFixed(1)}</b></div>`).join("")
         : '<span style="color:var(--tx3);font-size:12px">—</span>')}
     ${ultima ? card("ultima","ULTIMA VISITA","var(--cy)",
       `<div style="font-size:14px;font-weight:700">${esc(ultima.loja||"—")}</div>
@@ -1927,24 +1932,24 @@ function abrirInsight(key){
 
   if(key==="menorEstado"){
     const porUF = {}; F.forEach(r=>{(porUF[r.estado]=porUF[r.estado]||[]).push(r);});
-    const arr = Object.entries(porUF).map(([uf,l])=>({uf,nps:calcularNPS(l).nps,n:l.length,reg:UF_REGIAO[uf]||""})).sort((a,b)=>a.nps-b.nps);
-    $("kpipop-titulo").textContent = "NPS POR ESTADO (menor para maior)";
-    $("kpipop-corpo").innerHTML = arr.map(x=>linha(`${x.uf} · ${x.reg} <span style="color:var(--tx3);font-size:11px">(${x.n} visitas)</span>`, (x.nps>0?"+":"")+x.nps, corNPS(x.nps))).join("") || semDado();
+    const arr = Object.entries(porUF).map(([uf,l])=>({uf,nota:Math.round(estatNotas(l).mediaNota*10)/10,n:l.length,reg:UF_REGIAO[uf]||""})).sort((a,b)=>a.nota-b.nota);
+    $("kpipop-titulo").textContent = "NOTA MÉDIA POR ESTADO (menor para maior)";
+    $("kpipop-corpo").innerHTML = arr.map(x=>linha(`${x.uf} · ${x.reg} <span style="color:var(--tx3);font-size:11px">(${x.n} visitas)</span>`, x.nota.toFixed(1), corNota(x.nota))).join("") || semDado();
   } else if(key==="menorLojas"){
     const porLoja = {}; F.forEach(r=>{if(r.loja){const k=chaveFiltro(r.loja);if(!porLoja[k])porLoja[k]={nome:r.loja,itens:[]};porLoja[k].itens.push(r);}});
-    const arr = Object.values(porLoja).map(x=>({l:x.nome,nps:calcularNPS(x.itens).nps,n:x.itens.length,cidade:x.itens[0].cidade,uf:x.itens[0].estado})).sort((a,b)=>a.nps-b.nps);
-    $("kpipop-titulo").textContent = "NPS POR LOJA (menor para maior)";
-    $("kpipop-corpo").innerHTML = arr.map(x=>linha(`${esc(x.l)} <span style="color:var(--tx3);font-size:11px">${esc(x.cidade)}/${esc(x.uf)} · ${x.n}v</span>`, (x.nps>0?"+":"")+x.nps, corNPS(x.nps))).join("") || semDado();
+    const arr = Object.values(porLoja).map(x=>({l:x.nome,nota:Math.round(estatNotas(x.itens).mediaNota*10)/10,n:x.itens.length,cidade:x.itens[0].cidade,uf:x.itens[0].estado})).sort((a,b)=>a.nota-b.nota);
+    $("kpipop-titulo").textContent = "NOTA MÉDIA POR LOJA (menor para maior)";
+    $("kpipop-corpo").innerHTML = arr.map(x=>linha(`${esc(x.l)} <span style="color:var(--tx3);font-size:11px">${esc(x.cidade)}/${esc(x.uf)} · ${x.n}v</span>`, x.nota.toFixed(1), corNota(x.nota))).join("") || semDado();
   } else if(key==="ultima"){
     const arr = [...F].sort((a,b)=>new Date(b.data)-new Date(a.data)).slice(0,20);
     $("kpipop-titulo").textContent = "ULTIMAS VISITAS";
     $("kpipop-corpo").innerHTML = arr.map(r=>{
-      const nota = calcularNota(r), cls = classeDe(r);
+      const nota = calcularNota(r);
       return `<div style="padding:8px 0;border-bottom:1px solid rgba(30,42,58,.5)">
         <div style="display:flex;justify-content:space-between"><b style="font-size:13px">${esc(r.loja||"(sem loja)")}</b>
         <span class="mono" style="font-size:11px;color:var(--tx3)">${dtBR(r.data)}</span></div>
         <div style="font-size:12px;color:var(--tx2)">${esc(r.cidade||"")} — ${esc(r.estado)} · ${esc(r.vendedor)}
-        <span style="color:${SC[cls]}">· ${ROTULO[cls]} ${nota.toFixed(1)}</span></div>
+        <span style="color:${corNota(nota)}">· nota ${nota.toFixed(1)}</span></div>
         ${r.endereco?`<div style="font-size:11px;color:var(--tx3)">${esc(r.endereco)}</div>`:""}</div>`;
     }).join("") || semDado();
   }
