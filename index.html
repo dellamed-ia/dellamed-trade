@@ -42,7 +42,7 @@ select option{background:var(--card2);color:var(--tx)}
 .card select[style*="font-size:13px"], .card input[type="date"][style*="font-size:13px"]{min-width:120px}
 .card input[type="date"][style*="font-size:13px"]{min-width:140px}
 ::placeholder{color:var(--tx3)}
-input[type=date]{color-scheme:dark;min-height:38px}
+input[type=date],input[type=time]{color-scheme:dark;min-height:38px}
 @supports (-webkit-touch-callout:none){
   input,select,textarea{font-size:16px}
 }
@@ -81,6 +81,9 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
   display:flex;align-items:center;justify-content:center;padding:20px}
 .blink{animation:bk .8s infinite}
 @keyframes bk{0%,100%{opacity:1}50%{opacity:.25}}
+.atv-progress{height:5px;border-radius:999px;background:rgba(139,184,232,.15);overflow:hidden;margin:0 0 14px}
+.atv-progress>span{display:block;height:100%;width:38%;border-radius:999px;background:var(--azul);animation:atvbar 1s ease-in-out infinite}
+@keyframes atvbar{0%{transform:translateX(-110%)}100%{transform:translateX(290%)}}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
 @media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr}}
@@ -124,7 +127,14 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
       <button class="nav" id="nv-rel">RELATORIO</button>
       <button class="nav" id="nv-lojas">LOJAS NAO VISITADAS</button>
       <button class="nav" id="nv-prog">PROGRAMACAO</button>
-      <button class="nav" id="nv-dia">MEU DIA</button>
+      <button class="nav" id="nv-dia">AGENDA</button>
+      <div id="notif-wrap" style="position:relative;margin-left:2px">
+        <button class="nav" id="notif-btn" title="Avisos" style="position:relative;padding:7px 10px;display:flex;align-items:center;justify-content:center">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span id="notif-count" class="hide" style="position:absolute;right:-5px;top:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--rd);color:#fff;font-size:9px;font-weight:800;line-height:18px;text-align:center;border:2px solid #0C2D61">0</span>
+        </button>
+        <div id="notif-drop" class="hide" style="position:absolute;z-index:80;right:0;top:calc(100% + 8px);width:min(380px,92vw);max-height:430px;overflow-y:auto;background:var(--card);border:1px solid var(--bd);border-radius:10px;box-shadow:0 12px 28px rgba(0,0,0,.45);padding:10px"></div>
+      </div>
       <div style="display:flex;align-items:center;gap:8px;margin-left:6px;padding-left:10px;border-left:1px solid #1C3B66">
         <div style="text-align:right;line-height:1.3">
           <div id="hd-nome" style="font-size:11px;font-weight:700"></div>
@@ -198,7 +208,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
             <option value="9">9</option><option value="10">10</option>
           </select>
         </div>
-        <button id="fm-enviar" class="btn" style="margin-top:14px">ENVIAR</button>
+        <button id="fm-enviar" class="btn" style="margin-top:14px">SALVAR RELATO</button>
       </div>
       <div id="pendentes" style="margin-top:22px"></div>
     </section>
@@ -351,8 +361,15 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
       <div id="pg-lista"></div>
     </section>
 
-    <!-- MEU DIA -->
+    <!-- AGENDA -->
     <section id="vw-dia" class="hide">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px">
+        <div>
+          <h2 style="margin:0;font-size:15px;font-weight:700;letter-spacing:.04em">AGENDA</h2>
+          <div style="font-size:11px;color:var(--tx3);margin-top:4px">Visitas programadas e atividades avulsas</div>
+        </div>
+        <button class="btn" id="dia-add" style="width:40px;height:40px;padding:0;border-radius:10px;font-size:24px;line-height:40px" title="Criar atividade avulsa">+</button>
+      </div>
       <div id="dia-conteudo"></div>
     </section>
 
@@ -438,6 +455,43 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
   </div>
 </div>
 
+<div id="ov-atv" class="ovl hide" onclick="if(event.target===this)fechaAtividade()">
+  <div class="card" style="padding:24px;max-width:460px;width:100%;max-height:85vh;overflow-y:auto">
+    <h3 id="atv-titulo" style="margin:0 0 16px;font-size:14px;font-weight:700;letter-spacing:.04em">NOVA ATIVIDADE</h3>
+    <div id="atv-vend-wrap" style="margin-bottom:12px;display:none">
+      <label class="lbl">Vendedor</label>
+      <select id="atv-vend"></select>
+    </div>
+    <div class="grid2" style="margin-bottom:12px">
+      <div><label class="lbl">Data</label><input id="atv-data" type="date"></div>
+      <div><label class="lbl">Hora <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label><input id="atv-hora" type="time"></div>
+    </div>
+    <div class="grid2" style="margin-bottom:12px">
+      <div><label class="lbl">Estado</label><select id="atv-uf"><option value="">UF</option></select></div>
+      <div><label class="lbl">Cidade</label><input id="atv-cidade" type="text" autocomplete="off" placeholder="Selecione o estado primeiro" disabled></div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label class="lbl">Observação</label>
+      <textarea id="atv-obs" rows="4" style="resize:vertical;line-height:1.5" placeholder="Descreva a atividade..."></textarea>
+    </div>
+    <div id="atv-loading" class="atv-progress hide"><span></span></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="nav hide" id="atv-excluir" style="margin-right:auto;color:var(--rd);border-color:rgba(228,102,122,.5)">EXCLUIR</button>
+      <button class="nav" onclick="fechaAtividade()">CANCELAR</button>
+      <button class="btn" id="atv-salvar" style="padding:10px 28px">SALVAR</button>
+    </div>
+  </div>
+</div>
+
+<div id="ov-atvok" class="ovl hide">
+  <div class="card" style="padding:32px 28px;text-align:center;max-width:360px;width:100%;border-color:rgba(59,178,115,.4)">
+    <div style="width:12px;height:12px;border-radius:50%;background:var(--gr);box-shadow:0 0 16px var(--gr);margin:0 auto 18px"></div>
+    <h3 style="font-size:15px;font-weight:700;margin:0 0 6px;letter-spacing:.06em;color:var(--gr)">ATIVIDADE SALVA</h3>
+    <p id="atvok-txt" style="font-size:13px;color:var(--tx2);margin:0 0 24px"></p>
+    <button class="btn" style="padding:11px 50px" onclick="$('ov-atvok').classList.add('hide')">OK</button>
+  </div>
+</div>
+
 <div id="ov-kpi" class="ovl hide" onclick="if(event.target===this)fechaKpiPop()">
   <div class="card" style="padding:24px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -505,6 +559,10 @@ function estatNotas(lista){
 
 let USER = null, CRED = null, RELATOS = [], ABERTOS = new Set(), ABERTOS_HIST = new Set(), DEL_ID = null;
 let SELECIONADOS = new Set();
+let RELATOS_FILA = [];       // relatos salvos localmente antes do envio para analise
+let FILA_SEL = new Set();    // selecao multipla da fila local
+let FILA_ENVIANDO = false;
+let FILA_PROGRESS = null;    // {atual,total,ok,falhas,texto}
 let ULTIMA_CARGA = 0;
 let KPI_ABERTO = null;
 let LOJA_FILTRO = "";
@@ -512,11 +570,141 @@ let CLIENTES = [];        // aba CLIENTES
 let PROGRAMACOES = [];    // aba PROGRAMACAO
 let VENDEDORES = [];      // usuarios (admin usa pra programar em nome de outro)
 let PROG_EDIT = null;     // contexto do popup de programacao
+let ATV_EDIT_ID = null;   // atividade avulsa em edicao (armazenada junto das programacoes)
+const ATV_COD = "__ATIVIDADE_AVULSA_V1__";
 let FT_SEG = new Set();   // filtro multiplo segmento (relatorio)
 let FT_LOJA = new Set();  // filtro loja (relatorio, com busca)
 let charts = {};
 
 const $ = id => document.getElementById(id);
+
+/* ---------- FILA LOCAL DE RELATOS ---------- */
+function filaRelatosKey(){ return "trade_rel_queue_v1:"+((CRED&&CRED.email)||"anon").toLowerCase(); }
+function carregarFilaLocal(){
+  try{
+    const x = JSON.parse(localStorage.getItem(filaRelatosKey()) || "[]");
+    RELATOS_FILA = Array.isArray(x) ? x : [];
+  }catch(e){ RELATOS_FILA = []; }
+  FILA_SEL.clear(); FILA_PROGRESS = null; FILA_ENVIANDO = false;
+}
+function salvarFilaLocal(){
+  try{ localStorage.setItem(filaRelatosKey(), JSON.stringify(RELATOS_FILA)); }
+  catch(e){ alert("Nao foi possivel salvar o relato neste navegador."); }
+}
+function idFilaLocal(){ return "rl_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8); }
+function limparFormularioRelato(){
+  $("fm-texto").value = ""; $("fm-nota").value = "";
+  $("fm-loja").value = ""; $("fm-loja-busca").value = "";
+  $("fm-end-wrap").style.display = "none"; $("fm-end-info").style.display = "none";
+  $("fm-cnpj").value = ""; $("fm-cnpj-msg").style.display = "none";
+}
+function alternaFila(id){
+  if(FILA_ENVIANDO) return;
+  FILA_SEL.has(id) ? FILA_SEL.delete(id) : FILA_SEL.add(id);
+  renderPendentes();
+}
+function alternaTodosFila(marcar){
+  if(FILA_ENVIANDO) return;
+  FILA_SEL.clear();
+  if(marcar) RELATOS_FILA.forEach(r=>FILA_SEL.add(r.id));
+  renderPendentes();
+}
+function excluirFila(id){
+  if(FILA_ENVIANDO) return;
+  RELATOS_FILA = RELATOS_FILA.filter(r=>r.id!==id);
+  FILA_SEL.delete(id); salvarFilaLocal(); renderPendentes();
+}
+function excluirFilaSelecionados(){
+  if(FILA_ENVIANDO || !FILA_SEL.size) return;
+  if(!confirm("Excluir os relatos selecionados da fila?")) return;
+  RELATOS_FILA = RELATOS_FILA.filter(r=>!FILA_SEL.has(r.id));
+  FILA_SEL.clear(); salvarFilaLocal(); renderPendentes();
+}
+async function enviarFilaSelecionada(){
+  if(FILA_ENVIANDO) return;
+  const ids = [...FILA_SEL].filter(id=>RELATOS_FILA.some(r=>r.id===id));
+  if(!ids.length){ alert("Selecione pelo menos um relato para enviar."); return; }
+  FILA_ENVIANDO = true;
+  FILA_PROGRESS = {atual:0,total:ids.length,ok:0,falhas:0,texto:"Preparando envio..."};
+  renderPendentes();
+
+  for(let i=0;i<ids.length;i++){
+    const id=ids[i], item=RELATOS_FILA.find(r=>r.id===id);
+    if(!item) continue;
+    FILA_PROGRESS.atual=i;
+    FILA_PROGRESS.texto=`Enviando ${i+1} de ${ids.length} para analise...`;
+    renderPendentes();
+    try{
+      const r = await api("criar", Object.assign({}, item.payload, {clientDraftId:id}), 90000);
+      if(r && r.ok){
+        FILA_PROGRESS.ok++;
+        RELATOS_FILA = RELATOS_FILA.filter(x=>x.id!==id);
+        FILA_SEL.delete(id);
+        salvarFilaLocal();
+      }else{
+        FILA_PROGRESS.falhas++;
+      }
+    }catch(e){ FILA_PROGRESS.falhas++; }
+    FILA_PROGRESS.atual=i+1;
+    renderPendentes();
+  }
+
+  FILA_ENVIANDO = false;
+  FILA_PROGRESS.texto = FILA_PROGRESS.falhas
+    ? `${FILA_PROGRESS.ok} enviado(s) · ${FILA_PROGRESS.falhas} com falha. Os que falharam continuam salvos.`
+    : `${FILA_PROGRESS.ok} relato(s) enviado(s) com sucesso.`;
+  renderPendentes();
+
+  // Uma unica atualizacao ao final do lote, em vez de recarregar a cada relato.
+  await atualizarDataset("relatos", true);
+  renderHist(); renderPendentes();
+}
+
+/* ---------- ATIVIDADES AVULSAS + AVISOS ---------- */
+function ehAtividade(p){ return !!p && String(p.codCliente||"") === ATV_COD; }
+function programacoesVisita(){ return PROGRAMACOES.filter(p=>!ehAtividade(p)); }
+function atividadesAgenda(){ return PROGRAMACOES.filter(ehAtividade); }
+function notifKey(){ return "trade_notif_lidos:"+((CRED&&CRED.email)||"anon").toLowerCase(); }
+function notifLidos(){ try{ return new Set(JSON.parse(localStorage.getItem(notifKey())||"[]")); }catch(e){ return new Set(); } }
+function salvarNotifLidos(set){ try{ localStorage.setItem(notifKey(),JSON.stringify([...set])); }catch(e){} }
+function visitasPropriasFuturas(){
+  if(!USER || USER.role==="admin") return [];
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  return programacoesVisita().filter(p=>p.isOwn && new Date(p.dataProgramada)>=hoje)
+    .sort((a,b)=>new Date(a.dataProgramada)-new Date(b.dataProgramada));
+}
+function renderNotificacoes(){
+  const wrap=$("notif-wrap"), drop=$("notif-drop"), badge=$("notif-count");
+  if(!wrap || !drop || !badge) return;
+  if(!USER || USER.role==="admin"){
+    wrap.classList.add("hide"); drop.classList.add("hide"); return;
+  }
+  wrap.classList.remove("hide");
+  const lidos=notifLidos(), avisos=visitasPropriasFuturas();
+  const naoLidos=avisos.filter(p=>!lidos.has(String(p.id)));
+  badge.textContent=naoLidos.length>99?"99+":String(naoLidos.length);
+  badge.classList.toggle("hide",!naoLidos.length);
+  drop.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 10px;border-bottom:1px solid var(--bd)">
+      <b style="font-size:12px;letter-spacing:.05em">AVISOS</b>
+      ${naoLidos.length?`<button class="nav" id="notif-todos" style="font-size:9px;padding:4px 8px">MARCAR TODOS COMO LIDOS</button>`:""}
+    </div>` + (avisos.length ? avisos.map(p=>{
+      const lido=lidos.has(String(p.id));
+      return `<div style="padding:10px 6px;border-bottom:1px solid var(--bd);opacity:${lido?'.62':'1'}">
+        <div style="font-size:12px;line-height:1.45;color:var(--tx2)"><b style="color:var(--tx)">Visita agendada:</b> ${esc(p.loja)} — ${dtBR(p.dataProgramada).slice(0,5)}</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:3px">${esc(p.cidade||"")}${p.estado?` / ${esc(p.estado)}`:""}</div>
+        ${!lido?`<button class="nav notif-lido" data-id="${esc(String(p.id))}" style="font-size:9px;padding:4px 8px;margin-top:7px;color:var(--cy)">MARCAR COMO LIDO</button>`:`<span style="display:inline-block;margin-top:7px;font-size:9px;color:var(--tx3)">LIDO</span>`}
+      </div>`;
+    }).join("") : `<div class="mono" style="padding:24px 10px;text-align:center;color:var(--tx3);font-size:11px">// nenhum aviso</div>`);
+  drop.querySelectorAll(".notif-lido").forEach(b=>b.onclick=()=>marcarNotificacaoLida(b.dataset.id));
+  const todos=$("notif-todos"); if(todos) todos.onclick=()=>{
+    const s=notifLidos(); avisos.forEach(p=>s.add(String(p.id))); salvarNotifLidos(s); renderNotificacoes();
+  };
+}
+function marcarNotificacaoLida(id){ const s=notifLidos(); s.add(String(id)); salvarNotifLidos(s); renderNotificacoes(); }
+function marcarNovasPropriasComoLidas(idsAntes){
+  if(!USER || USER.role==="admin") return;
+  const s=notifLidos(); visitasPropriasFuturas().forEach(p=>{ if(!idsAntes.has(String(p.id))) s.add(String(p.id)); }); salvarNotifLidos(s);
+}
 
 /* ---------- DESEMPENHO / CARREGAMENTO SOB DEMANDA ---------- */
 const LIB_URL = {
@@ -685,7 +873,7 @@ function limparDadosMemoria(){
 function aplicarDataset(tipo,data,ts){
   if(!Array.isArray(data)) return;
   if(tipo==="clientes"){ CLIENTES=clientesUnicos(data); reindexarClientes(); }
-  else if(tipo==="programacoes") PROGRAMACOES=data;
+  else if(tipo==="programacoes"){ PROGRAMACOES=data; setTimeout(renderNotificacoes,0); }
   else if(tipo==="relatos"){ RELATOS=data; ULTIMA_CARGA=ts||Date.now(); }
   else if(tipo==="vendedores") VENDEDORES=data;
   DATA_TS[tipo]=ts||Date.now();
@@ -712,7 +900,7 @@ async function atualizarDataset(tipo, forcar=false){
 }
 async function atualizarDatasets(tipos, forcar=false){ return Promise.all(tipos.map(t=>atualizarDataset(t,forcar))); }
 function redesenharVisivel(){
-  populaFmUF(); renderPendentes(); renderHist();
+  populaFmUF(); renderPendentes(); renderHist(); renderNotificacoes();
   if(!$(`vw-rel`).classList.contains("hide") && window.Chart) renderRel();
   if(!$(`vw-lojas`).classList.contains("hide")) renderLojas();
   if(!$(`vw-prog`).classList.contains("hide")) renderProg();
@@ -804,7 +992,8 @@ async function iniciar(){
 
   // Mostra dados locais imediatamente; consulta somente o que a tela inicial precisa.
   const tinhaCache = hidratarCache();
-  populaFmUF(); renderPendentes(); renderHist();
+  carregarFilaLocal();
+  populaFmUF(); renderPendentes(); renderHist(); renderNotificacoes();
   // NAO baixa mais a base de clientes (33MB) no login. CNPJ e lojas sao sob demanda.
   // A base completa so carrega quando o usuario abre a aba "Lojas nao visitadas".
   const precisaBloquear = !RELATOS.length;
@@ -812,6 +1001,7 @@ async function iniciar(){
   await atualizarDataset("relatos", true);
   if(precisaBloquear) unload();
   redesenharVisivel();
+  atualizarDataset("programacoes", true).then(()=>renderNotificacoes());
 }
 
 async function carregarClientes(forcar=false){
@@ -835,6 +1025,11 @@ async function recarregar(){
 async function atualizarTudoBg(){
   await atualizarDatasets(["clientes","programacoes","relatos"]);
 }
+
+$("notif-btn").onclick = e => { e.stopPropagation(); $("notif-drop").classList.toggle("hide"); renderNotificacoes(); };
+document.addEventListener("click", e=>{ if(!e.target.closest("#notif-wrap")) $("notif-drop").classList.add("hide"); });
+// Mantem o sino atualizado mesmo se o vendedor ficar com o app aberto.
+setInterval(()=>{ if(USER) atualizarDataset("programacoes").then(renderNotificacoes); }, 60000);
 
 /* ---------- NAVEGACAO ---------- */
 const TABS = ["novo","hist","rel","lojas","prog","dia"];
@@ -1070,7 +1265,7 @@ function isoParaBR(iso){
   return d + "/" + m + "/" + a;
 }
 
-$("fm-enviar").onclick = async () => {
+$("fm-enviar").onclick = () => {
   const uf = $("fm-uf").value, dt = isoParaBR($("fm-data").value), tx = $("fm-texto").value.trim();
   const nota = $("fm-nota").value;
   if(!uf || !dt || !tx){ alert("Preencha estado, data e o relato."); return; }
@@ -1083,35 +1278,94 @@ $("fm-enviar").onclick = async () => {
     if(enSel!==""){ const c = filiais[parseInt(enSel)]; if(c){ cidade=c.cidade; endereco=enderecoCompleto(c); } }
     else if(filiais[0]){ cidade = filiais[0].cidade; }
   }
-  load("enviando e analisando...");
-  try{
-    const r = await api("criar", {estado:uf, dataVisita:dt, texto:tx, loja, cidade, endereco, nota});
-    unload();
-    if(!r.ok){ alert(r.erro || "Falha ao enviar."); return; }
-    $("fm-texto").value = ""; $("fm-nota").value = "";
-    $("fm-loja").value = ""; $("fm-loja-busca").value = ""; $("fm-end-wrap").style.display = "none"; $("fm-end-info").style.display = "none";
-    $("fm-cnpj").value = ""; $("fm-cnpj-msg").style.display = "none";
-    $("ov-ok").classList.remove("hide");
-    await recarregar();
-  }catch(e){ unload(); alert("Sem conexao. O relato nao foi enviado, tente de novo."); }
+
+  const item = {
+    id:idFilaLocal(),
+    criadoEm:new Date().toISOString(),
+    vendedor:(USER&&USER.nome)||"",
+    payload:{estado:uf, dataVisita:dt, texto:tx, loja, cidade, endereco, nota}
+  };
+  RELATOS_FILA.unshift(item);
+  salvarFilaLocal();
+  limparFormularioRelato();
+  renderPendentes();
+
+  // Feedback rapido, sem chamada ao servidor e sem bloquear o vendedor.
+  const btn=$("fm-enviar"), antigo=btn.textContent;
+  btn.textContent="SALVO ✓"; btn.disabled=true;
+  setTimeout(()=>{ btn.textContent=antigo; btn.disabled=false; },700);
 };
 
-/* ---------- PENDENTES ---------- */
+/* ---------- PENDENTES / FILA DE ENVIO ---------- */
 function renderPendentes(){
-  const p = RELATOS.filter(r => !r.analisado);
-  if(!p.length){ $("pendentes").innerHTML = ""; return; }
-  $("pendentes").innerHTML =
-    `<h3 style="font-size:11px;font-weight:700;color:var(--am);letter-spacing:.08em;margin-bottom:12px">ENVIOS PENDENTES</h3>` +
-    p.map(r => `
-      <div class="card" style="padding:10px 14px;border-left:3px solid var(--am);margin-bottom:6px;
-        display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div style="flex:1;min-width:0">
-          <div class="mono" style="font-size:11px;color:var(--tx3)">${dtBR(r.data)} // ${esc(r.vendedor)} // ${esc(r.estado)}</div>
-          <div style="font-size:12px;color:var(--tx2);margin-top:3px">${esc(r.textoOriginal.slice(0,80))}${r.textoOriginal.length>80?"...":""}</div>
+  // remove selecoes que nao existem mais
+  [...FILA_SEL].forEach(id=>{ if(!RELATOS_FILA.some(r=>r.id===id)) FILA_SEL.delete(id); });
+  const servidor = RELATOS.filter(r => !r.analisado);
+  if(!RELATOS_FILA.length && !servidor.length){ $("pendentes").innerHTML = ""; return; }
+
+  let html="";
+  if(RELATOS_FILA.length){
+    const todos = RELATOS_FILA.length>0 && FILA_SEL.size===RELATOS_FILA.length;
+    const pct = FILA_PROGRESS && FILA_PROGRESS.total ? Math.round((FILA_PROGRESS.atual/FILA_PROGRESS.total)*100) : 0;
+    html += `
+      <div class="card" style="padding:16px;margin-bottom:16px;border-color:rgba(139,184,232,.38)">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px">
+          <div>
+            <h3 style="font-size:11px;font-weight:800;color:var(--cy);letter-spacing:.08em;margin:0 0 5px">RELATOS SALVOS · AGUARDANDO ENVIO</h3>
+            <div style="font-size:11px;color:var(--tx3);line-height:1.5">Salvos neste navegador. Voce pode continuar registrando visitas e enviar varios de uma vez depois.</div>
+          </div>
+          <span class="pill" style="background:rgba(139,184,232,.12);color:var(--cy);border:1px solid rgba(139,184,232,.28)">${RELATOS_FILA.length} SALVO${RELATOS_FILA.length===1?"":"S"}</span>
         </div>
-        <button class="nav" style="border-color:rgba(233,180,76,.5);background:rgba(233,180,76,.12);
-          color:var(--am);font-size:10px;padding:5px 12px" onclick="reanalisar('${r.id}')">ATUALIZAR</button>
-      </div>`).join("");
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--tx2);cursor:${FILA_ENVIANDO?"default":"pointer"}">
+            <input type="checkbox" ${todos?"checked":""} ${FILA_ENVIANDO?"disabled":""} onchange="alternaTodosFila(this.checked)" style="width:15px;height:15px;padding:0;accent-color:var(--cy)">
+            Selecionar todos
+          </label>
+          <span class="mono" style="font-size:10px;color:var(--tx3)">${FILA_SEL.size} selecionado${FILA_SEL.size===1?"":"s"}</span>
+          <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap">
+            ${FILA_SEL.size && !FILA_ENVIANDO ? `<button class="nav" onclick="excluirFilaSelecionados()" style="font-size:10px;padding:6px 10px;color:var(--rd);border-color:rgba(228,102,122,.45)">EXCLUIR SELECIONADOS</button>` : ""}
+            <button class="btn" onclick="enviarFilaSelecionada()" ${!FILA_SEL.size||FILA_ENVIANDO?"disabled":""} style="font-size:10px;padding:7px 14px">${FILA_ENVIANDO?"ENVIANDO...":"ENVIAR PARA ANÁLISE"}</button>
+          </div>
+        </div>
+        ${FILA_PROGRESS ? `
+          <div style="margin:10px 0 12px">
+            <div style="height:8px;border-radius:999px;background:var(--card2);border:1px solid var(--bd);overflow:hidden">
+              <div style="height:100%;width:${Math.max(0,Math.min(100,pct))}%;background:var(--cy);transition:width .2s ease"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:10px;color:var(--tx3)">
+              <span>${esc(FILA_PROGRESS.texto||"")}</span><span class="mono">${pct}%</span>
+            </div>
+          </div>` : ""}
+        <div>
+          ${RELATOS_FILA.map(item=>{
+            const p=item.payload||{}, sel=FILA_SEL.has(item.id);
+            return `<div style="padding:10px 4px;border-bottom:1px solid rgba(28,59,102,.75);display:flex;gap:10px;align-items:flex-start">
+              <input type="checkbox" ${sel?"checked":""} ${FILA_ENVIANDO?"disabled":""} onchange="alternaFila('${item.id}')" style="width:16px;height:16px;padding:0;margin-top:2px;accent-color:var(--cy);flex-shrink:0">
+              <div style="flex:1;min-width:0">
+                <div class="mono" style="font-size:10px;color:var(--tx3)">${esc(p.dataVisita||"")} // ${esc(p.estado||"")}${p.cidade?" // "+esc(p.cidade):""}</div>
+                ${p.loja?`<div style="font-size:12px;font-weight:700;margin-top:3px">${esc(p.loja)}</div>`:""}
+                <div style="font-size:12px;color:var(--tx2);margin-top:3px;line-height:1.45">${esc((p.texto||"").slice(0,130))}${(p.texto||"").length>130?"...":""}</div>
+                <div style="font-size:10px;color:var(--tx3);margin-top:4px">Nota: ${esc(p.nota)}</div>
+              </div>
+              ${!FILA_ENVIANDO?`<button class="nav" onclick="excluirFila('${item.id}')" style="font-size:9px;padding:4px 8px;color:var(--rd)">EXCLUIR</button>`:""}
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+  }
+
+  if(servidor.length){
+    html += `<h3 style="font-size:11px;font-weight:700;color:var(--am);letter-spacing:.08em;margin:18px 0 12px">ENVIADOS · AGUARDANDO ANÁLISE</h3>` +
+      servidor.map(r => `
+        <div class="card" style="padding:10px 14px;border-left:3px solid var(--am);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div class="mono" style="font-size:11px;color:var(--tx3)">${dtBR(r.data)} // ${esc(r.vendedor)} // ${esc(r.estado)}</div>
+            <div style="font-size:12px;color:var(--tx2);margin-top:3px">${esc(r.textoOriginal.slice(0,80))}${r.textoOriginal.length>80?"...":""}</div>
+          </div>
+          <button class="nav" style="border-color:rgba(233,180,76,.5);background:rgba(233,180,76,.12);color:var(--am);font-size:10px;padding:5px 12px" onclick="reanalisar('${r.id}')">ATUALIZAR</button>
+        </div>`).join("");
+  }
+  $("pendentes").innerHTML = html;
 }
 
 async function reanalisar(id){
@@ -2035,7 +2289,7 @@ function lojasVisitadasSet(){
 function progIndex(){
   // mapa loja|estado -> { lista:[progs], prox: prog mais proxima, total:n }
   const m = {};
-  PROGRAMACOES.forEach(p => {
+  programacoesVisita().forEach(p => {
     const k = chaveLoja(p.estado,p.loja);
     if(!m[k]) m[k] = { lista:[], prox:null, total:0 };
     m[k].lista.push(p);
@@ -2088,7 +2342,7 @@ function renderLojas(){
   // filtro de vendedor: usa a lista completa de vendedores; se nao houver, cai pros que ja programaram
   const nomesVend = VENDEDORES.length
     ? VENDEDORES.filter(v=>v.role==="vendedor").map(v=>v.nome)
-    : valoresUnicos(PROGRAMACOES.map(p=>p.vendedor));
+    : valoresUnicos(programacoesVisita().map(p=>p.vendedor));
   preencheSelect("lj-vend", nomesVend, "Todos", "nome");
 
   const visit = lojasVisitadasSet();
@@ -2451,8 +2705,8 @@ function renderProg(){
   const soAnota = $("pg-soanota").checked;
   const adm = USER && USER.role==="admin";
 
-  // todos veem todas as programacoes
-  const universo = PROGRAMACOES;
+  // todos veem todas as visitas programadas; atividades avulsas ficam somente na AGENDA
+  const universo = programacoesVisita();
 
   preencheSelect("pg-uf", universo.map(p=>p.estado), "Todos", "estado");
   const baseCid = uf ? universo.filter(p=>mesmoFiltro(p.estado,uf)) : universo;
@@ -2552,6 +2806,7 @@ $("prog-salvar").onclick = async () => {
   if(!datas.length){ alert("Adicione ao menos uma data."); return; }
 
   const adm = USER && USER.role==="admin";
+  const idsPropriosAntes = !adm ? new Set(visitasPropriasFuturas().map(p=>String(p.id))) : null;
   const vendedorEmail = (adm && $("prog-vend").value) ? $("prog-vend").value : null;
   const endereco = $("prog-end").value;
   const base = {
@@ -2583,6 +2838,8 @@ $("prog-salvar").onclick = async () => {
 
     // atualiza as listas em segundo plano (nao trava o feedback)
     carregarProgramacoes(true).then(()=>{
+      if(idsPropriosAntes) marcarNovasPropriasComoLidas(idsPropriosAntes);
+      renderNotificacoes();
       if(!$("vw-lojas").classList.contains("hide")) renderLojas();
       if(!$("vw-prog").classList.contains("hide")) renderProg();
       if(!$("vw-dia").classList.contains("hide")) renderDia();
@@ -2595,7 +2852,7 @@ $("pg-excel").onclick = async () => {
   load("preparando Excel...");
   try{ await garantirExcel(); }catch(e){ unload(); alert("Nao foi possivel carregar o exportador Excel."); return; }
   unload();
-  const ws = XLSX.utils.json_to_sheet(PROGRAMACOES.map(p=>({
+  const ws = XLSX.utils.json_to_sheet(programacoesVisita().map(p=>({
     DATA:dtBR(p.dataProgramada), LOJA:p.loja, ENDERECO:p.endereco, CIDADE:p.cidade,
     ESTADO:p.estado, VENDEDOR:p.vendedor, ANOTACAO:p.anotacao
   })));
@@ -2605,8 +2862,84 @@ $("pg-excel").onclick = async () => {
 };
 
 /* ============================================================
-   MEU DIA (agenda estilo planner)
+   AGENDA (visitas programadas + atividades avulsas)
    ============================================================ */
+function isoHoje(){ const d=new Date(); return isoDe(d.getFullYear(),d.getMonth(),d.getDate()); }
+function populaAtvUF(){ $("atv-uf").innerHTML='<option value="">UF</option>'+UFS.map(u=>`<option value="${u}">${u}</option>`).join(""); }
+function atualizaAtvCidade(){
+  const temUF=!!$("atv-uf").value;
+  $("atv-cidade").disabled=!temUF;
+  $("atv-cidade").placeholder=temUF?"Cidade":"Selecione o estado primeiro";
+}
+$("atv-uf").onchange=atualizaAtvCidade;
+function montaAtvVend(email){
+  const adm=USER && USER.role==="admin";
+  $("atv-vend-wrap").style.display=adm?"block":"none";
+  if(!adm) return;
+  const lista=(VENDEDORES.length?VENDEDORES:[]).filter(v=>v.role==="vendedor");
+  $("atv-vend").innerHTML=lista.map(v=>`<option value="${esc(textoLimpo(v.email))}">${esc(textoOriginal(v.nome))}</option>`).join("");
+  const alvo=(email||"").toLowerCase();
+  if(alvo && [...$("atv-vend").options].some(o=>o.value.toLowerCase()===alvo)) $("atv-vend").value=alvo;
+}
+async function abrirAtividade(id){
+  if(USER && USER.role==="admin" && !VENDEDORES.length){ load("carregando vendedores..."); await atualizarDataset("vendedores"); unload(); }
+  populaAtvUF(); ATV_EDIT_ID=id||null;
+  const p=id?PROGRAMACOES.find(x=>String(x.id)===String(id) && ehAtividade(x)):null;
+  $("atv-titulo").textContent=p?"EDITAR ATIVIDADE":"NOVA ATIVIDADE";
+  $("atv-data").value=p&&p.dataProgramada?String(p.dataProgramada).slice(0,10):isoHoje();
+  $("atv-hora").value=p&&p.endereco?String(p.endereco).slice(0,5):"";
+  $("atv-uf").value=p?estadoLimpo(p.estado):"";
+  $("atv-cidade").value=p?p.cidade||"":"";
+  atualizaAtvCidade();
+  $("atv-obs").value=p?p.anotacao||"":"";
+  montaAtvVend(p?p.owner:"");
+  $("atv-excluir").classList.toggle("hide",!p);
+  $("ov-atv").classList.remove("hide");
+}
+function fechaAtividade(){ $("ov-atv").classList.add("hide"); ATV_EDIT_ID=null; }
+$("dia-add").onclick=()=>abrirAtividade();
+
+$("atv-salvar").onclick=async()=>{
+  const btn=$("atv-salvar");
+  if(btn.disabled) return;
+  const data=$("atv-data").value, hora=$("atv-hora").value, cidade=$("atv-cidade").value.trim(), uf=$("atv-uf").value, obs=$("atv-obs").value.trim();
+  if(!data || !cidade || !uf){ alert("Preencha data, estado e cidade."); return; }
+  const adm=USER && USER.role==="admin";
+  const extra={ id:ATV_EDIT_ID||"", codCliente:ATV_COD, loja:"ATIVIDADE AVULSA", estado:uf, cidade, endereco:hora, dataProgramada:isoParaBR(data), anotacao:obs };
+  if(adm){
+    const vend=$("atv-vend").value;
+    if(!vend){ alert("Selecione o vendedor."); return; }
+    extra.vendedorEmail=vend;
+  }
+  btn.disabled=true;
+  btn.textContent="SALVANDO...";
+  $("atv-loading").classList.remove("hide");
+  load("salvando atividade...");
+  try{
+    const r=await api("salvarProg",extra);
+    if(!r || !r.ok){ alert((r&&r.erro)||"Nao foi possivel salvar a atividade."); return; }
+    const resumo=`${isoParaBR(data)}${hora?` às ${hora}`:""} · ${cidade}/${uf}`;
+    fechaAtividade(); $("atvok-txt").textContent=resumo; $("ov-atvok").classList.remove("hide");
+    await carregarProgramacoes(true); renderNotificacoes();
+    if(!$("vw-dia").classList.contains("hide")) renderDia();
+    if(!$("vw-prog").classList.contains("hide")) renderProg();
+  }catch(e){ alert("Sem conexao. A atividade nao foi salva."); }
+  finally{
+    unload();
+    btn.disabled=false;
+    btn.textContent="SALVAR";
+    $("atv-loading").classList.add("hide");
+  }
+};
+
+$("atv-excluir").onclick=async()=>{
+  if(!ATV_EDIT_ID || !confirm("Excluir esta atividade?")) return;
+  const id=ATV_EDIT_ID; fechaAtividade(); load("excluindo atividade...");
+  try{ const r=await api("excluirProg",{id}); unload(); if(!r||!r.ok){ alert((r&&r.erro)||"Nao foi possivel excluir."); return; }
+    await carregarProgramacoes(true); renderNotificacoes(); renderDia();
+  }catch(e){ unload(); alert("Sem conexao."); }
+};
+
 function renderDia(){
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const diaMs = 86400000;
@@ -2615,15 +2948,20 @@ function renderDia(){
   const iniProxSemana = new Date(fimSemana);
   const fimProxSemana = new Date(fimSemana.getTime()+7*diaMs);
   const fimMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0, 23,59,59);
-
-  // admin ve a agenda de todos; vendedor ve so a propria
   const adm = USER && USER.role==="admin";
-  const base = adm ? PROGRAMACOES : PROGRAMACOES.filter(p=>p.isOwn);
-  const minhas = base.slice().sort((a,b)=>new Date(a.dataProgramada)-new Date(b.dataProgramada));
 
-  const baldes = {hoje:[], amanha:[], semana:[], proxSemana:[], mes:[], futuro:[]};
-  minhas.forEach(p => {
-    const d = new Date(p.dataProgramada); d.setHours(0,0,0,0);
+  // Mantem as visitas da Programacao com a mesma regra atual e acrescenta atividades avulsas.
+  const visitas=(adm?programacoesVisita():programacoesVisita().filter(p=>p.isOwn)).map(p=>Object.assign({__tipo:"visita"},p));
+  const atvs=(adm?atividadesAgenda():atividadesAgenda().filter(p=>p.isOwn)).map(p=>Object.assign({__tipo:"atividade"},p));
+  const agenda=visitas.concat(atvs).sort((a,b)=>{
+    const da=new Date(a.dataProgramada), db=new Date(b.dataProgramada); const c=da-db;
+    if(c) return c;
+    return String(a.endereco||"").localeCompare(String(b.endereco||""));
+  });
+
+  const baldes={hoje:[],amanha:[],semana:[],proxSemana:[],mes:[],futuro:[]};
+  agenda.forEach(p=>{
+    const d=new Date(p.dataProgramada); d.setHours(0,0,0,0);
     if(d.getTime()===hoje.getTime()) baldes.hoje.push(p);
     else if(d.getTime()===amanha.getTime()) baldes.amanha.push(p);
     else if(d>amanha && d<=fimSemana) baldes.semana.push(p);
@@ -2632,8 +2970,21 @@ function renderDia(){
     else if(d>fimMes) baldes.futuro.push(p);
   });
 
-  const item = p => {
-    const temNota = (p.anotacao||"").trim();
+  const item=p=>{
+    if(p.__tipo==="atividade"){
+      const pode=adm || p.isOwn;
+      return `<div class="card" style="padding:12px 14px;margin-bottom:8px;border-left:3px solid var(--am);cursor:${pode?'pointer':'default'}" ${pode?`onclick="abrirAtividade('${esc(String(p.id))}')"`:''}>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+          <b style="font-size:14px">ATIVIDADE AVULSA</b>
+          <span class="mono" style="font-size:11px;color:var(--am)">${dtBR(p.dataProgramada)}${p.endereco?` · ${esc(p.endereco)}`:""}</span>
+        </div>
+        <div style="font-size:12px;color:var(--tx2);margin-top:3px">${esc(p.cidade||"")} — ${esc(p.estado||"")}</div>
+        ${adm?`<div style="font-size:11px;font-weight:700;color:var(--cy);margin-top:4px">👤 ${esc(p.vendedor||"")}</div>`:""}
+        ${p.anotacao?`<div style="margin-top:6px;font-size:12px;color:var(--tx2);line-height:1.5">${esc(p.anotacao)}</div>`:""}
+        <div style="font-size:9px;color:var(--tx3);margin-top:7px">clique para editar ou excluir</div>
+      </div>`;
+    }
+    const temNota=(p.anotacao||"").trim();
     return `<div class="card" style="padding:12px 14px;margin-bottom:8px;border-left:3px solid var(--cy)">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
         <b style="font-size:14px">${esc(p.loja)}</b>
@@ -2645,30 +2996,13 @@ function renderDia(){
       ${temNota?`<div style="margin-top:6px;font-size:12px;color:var(--tx2)"><span style="color:var(--rd);font-weight:700">!</span> ${esc(p.anotacao)}</div>`:""}
     </div>`;
   };
-
-  // secoes empilhadas (uma abaixo da outra)
-  const secao = (titulo, cor, arr) => {
-    if(!arr.length) return "";
-    return `<div style="margin-bottom:22px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${cor}">
-        <h4 style="margin:0;font-size:13px;letter-spacing:.06em;color:${cor}">${titulo}</h4>
-        <span style="font-size:11px;color:var(--tx3);background:var(--card2);padding:1px 8px;border-radius:10px">${arr.length}</span>
-      </div>
-      ${arr.map(item).join("")}
-    </div>`;
-  };
-
-  const html = [
-    secao("HOJE","var(--gr)",baldes.hoje),
-    secao("AMANHA","var(--cy)",baldes.amanha),
-    secao("RESTANTE DA SEMANA","var(--am)",baldes.semana),
-    secao("SEMANA QUE VEM","var(--pu)",baldes.proxSemana),
-    secao("RESTANTE DO MES","var(--mg)",baldes.mes),
-    secao("DEPOIS","var(--tx3)",baldes.futuro)
-  ].join("");
-
-  $("dia-conteudo").innerHTML = html ||
-    `<div class="mono" style="text-align:center;padding:50px;color:var(--tx3);font-size:13px">// nenhuma visita programada</div>`;
+  const secao=(titulo,cor,arr)=>!arr.length?"":`<div style="margin-bottom:22px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${cor}">
+      <h4 style="margin:0;font-size:13px;letter-spacing:.06em;color:${cor}">${titulo}</h4>
+      <span style="font-size:11px;color:var(--tx3);background:var(--card2);padding:1px 8px;border-radius:10px">${arr.length}</span>
+    </div>${arr.map(item).join("")}</div>`;
+  const html=[secao("HOJE","var(--gr)",baldes.hoje),secao("AMANHA","var(--cy)",baldes.amanha),secao("RESTANTE DA SEMANA","var(--am)",baldes.semana),secao("SEMANA QUE VEM","var(--pu)",baldes.proxSemana),secao("RESTANTE DO MES","var(--mg)",baldes.mes),secao("DEPOIS","var(--tx3)",baldes.futuro)].join("");
+  $("dia-conteudo").innerHTML=html||`<div class="mono" style="text-align:center;padding:50px;color:var(--tx3);font-size:13px">// nenhuma visita ou atividade na agenda</div>`;
 }
 
 /* ---------- SESSAO SALVA (otimizada: cache-first, login em background) ---------- */
@@ -2691,7 +3025,7 @@ function renderDia(){
         $("hd-role").style.color = adm ? "var(--am)" : "var(--tx3)";
         $("fm-vend").textContent = USER.nome;
         $("ft-excel").classList.toggle("hide", !adm);
-        populaFmUF(); renderPendentes(); renderHist();
+        populaFmUF(); renderPendentes(); renderHist(); renderNotificacoes();
       }catch(e){ /* fallback abaixo */ }
     }
     // login em background (nao bloqueia a tela)
@@ -2703,7 +3037,7 @@ function renderDia(){
       USER = r.usuario;
       localStorage.setItem("trade_user", JSON.stringify(USER));
       if(!jaAbriu) iniciar();
-      else{ atualizarDatasets(["clientes","relatos"]).then(redesenharVisivel); }
+      else{ atualizarDatasets(["clientes","relatos","programacoes"]).then(redesenharVisivel); }
     } else {
       localStorage.removeItem("trade_cred");
       localStorage.removeItem("trade_user");
