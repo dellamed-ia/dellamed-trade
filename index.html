@@ -712,8 +712,10 @@ async function atualizarDataset(tipo, forcar=false){
   if(!forcar && datasetFresco(tipo)) return false;
   if(DATA_REQ.has(tipo)) return DATA_REQ.get(tipo);
   const cfg=DATA_CFG[tipo];
-  const req=api(cfg.acao).then(r=>{
-    if(r&&r.ok&&Array.isArray(r[cfg.campo])){ aplicarDataset(tipo,r[cfg.campo],Date.now()); gravarCache(tipo,r[cfg.campo]); return true; }
+  // clientes e uma base grande (dezenas de milhares de linhas): timeout maior
+  const timeoutMs = (tipo==="clientes") ? 90000 : 25000;
+  const req=api(cfg.acao, null, timeoutMs).then(r=>{
+    if(r&&r.ok&&Array.isArray(r[cfg.campo])){ aplicarDataset(tipo,r[cfg.campo],Date.now()); if(tipo!=="clientes") gravarCache(tipo,r[cfg.campo]); return true; }
     return false;
   }).catch(()=>false).finally(()=>DATA_REQ.delete(tipo));
   DATA_REQ.set(tipo,req);
@@ -730,10 +732,10 @@ function redesenharVisivel(){
 
 /* ---------- API ---------- */
 // Content-Type text/plain evita o preflight CORS que o Apps Script nao responde
-async function api(acao, extra){
+async function api(acao, extra, timeoutMs){
   const body = Object.assign({acao}, CRED || {}, extra || {});
   const ctrl = new AbortController();
-  const timer = setTimeout(()=>ctrl.abort(), 25000);
+  const timer = setTimeout(()=>ctrl.abort(), timeoutMs || 25000);
   try{
     const res = await fetch(API_URL, {
       method:"POST",
@@ -800,9 +802,11 @@ async function iniciar(){
   // Mostra dados locais imediatamente; consulta somente o que a tela inicial precisa.
   const tinhaCache = hidratarCache();
   populaFmUF(); renderPendentes(); renderHist();
-  const precisaBloquear = !tinhaCache && !CLIENTES.length && !RELATOS.length;
-  if(precisaBloquear) load("carregando dados...");
-  await atualizarDatasets(["clientes","relatos"]);
+  // NAO baixa mais a base de clientes (33MB) no login. CNPJ e lojas sao sob demanda.
+  // A base completa so carrega quando o usuario abre a aba "Lojas nao visitadas".
+  const precisaBloquear = !RELATOS.length;
+  if(precisaBloquear) load("carregando...");
+  await atualizarDataset("relatos", true);
   if(precisaBloquear) unload();
   redesenharVisivel();
 }
@@ -856,11 +860,16 @@ $("nv-rel").onclick  = async () => {
 };
 $("nv-lojas").onclick = () => {
   irPara("lojas"); renderLojas();
-  atualizarDatasets(["clientes","relatos","programacoes"]).then(()=>{ if(!$("vw-lojas").classList.contains("hide")) renderLojas(); });
+  const precisa = !CLIENTES.length;   // base completa so e necessaria aqui
+  if(precisa) load("carregando base de clientes (pode levar alguns segundos)...");
+  atualizarDatasets(["clientes","relatos","programacoes"]).then(()=>{
+    if(precisa) unload();
+    if(!$("vw-lojas").classList.contains("hide")) renderLojas();
+  });
 };
 $("nv-prog").onclick = () => {
   irPara("prog"); renderProg();
-  const dados=["clientes","programacoes"]; if(USER.role==="admin") dados.push("vendedores");
+  const dados=["programacoes"]; if(USER.role==="admin") dados.push("vendedores");
   atualizarDatasets(dados).then(()=>{ if(!$("vw-prog").classList.contains("hide")) renderProg(); });
 };
 $("nv-dia").onclick = () => {
@@ -868,10 +877,46 @@ $("nv-dia").onclick = () => {
   atualizarDataset("programacoes").then(()=>{ if(!$("vw-dia").classList.contains("hide")) renderDia(); });
 };
 
+/* ---------- CLIENTES SOB DEMANDA (base grande nao fica em memoria) ---------- */
+// cache de lojas por UF durante a sessao: evita rebuscar o mesmo estado
+const LOJAS_UF_CACHE = new Map();   // uf -> array de clientes daquele estado
+const LOJAS_UF_REQ = new Map();     // uf -> promise em andamento
+
+// busca no servidor todos os clientes de um estado e indexa localmente (so aquele UF)
+async function carregarLojasUF(uf){
+  const chave = estadoLimpo(uf);
+  if(!chave) return [];
+  if(LOJAS_UF_CACHE.has(chave)) return LOJAS_UF_CACHE.get(chave);
+  if(LOJAS_UF_REQ.has(chave)) return LOJAS_UF_REQ.get(chave);
+  const req = api("lojasUF", {uf:chave}, 60000).then(r=>{
+    const lista = (r && r.ok && Array.isArray(r.clientes)) ? clientesUnicos(r.clientes) : [];
+    LOJAS_UF_CACHE.set(chave, lista);
+    indexarClientesParciais(lista);   // alimenta CLIENTE_IDX com esse UF
+    return lista;
+  }).catch(()=>[]).finally(()=>LOJAS_UF_REQ.delete(chave));
+  LOJAS_UF_REQ.set(chave, req);
+  return req;
+}
+
+// adiciona um lote de clientes ao CLIENTE_IDX sem apagar o que ja existe (merge por UF)
+function indexarClientesParciais(lista){
+  (lista||[]).forEach(c=>{
+    const uf=estadoLimpo(c.estado);
+    if(uf){ if(!CLIENTE_IDX.porUF.has(uf)) CLIENTE_IDX.porUF.set(uf,new Map()); const lojas=CLIENTE_IDX.porUF.get(uf); const kl=chaveFiltro(c.loja); if(kl && !lojas.has(kl)) lojas.set(kl,textoOriginal(c.loja)); }
+    const cj=soDigitos(c.cnpj); if(cj) CLIENTE_IDX.porCNPJ.set(cj,c);
+    const k=chaveLoja(c.estado,c.loja);
+    if(!CLIENTE_IDX.porLojaUF.has(k)) CLIENTE_IDX.porLojaUF.set(k,[]);
+    CLIENTE_IDX.porLojaUF.get(k).push(c);
+    if(c.segmento && !CLIENTE_IDX.segmento.has(k)) CLIENTE_IDX.segmento.set(k,c.segmento);
+  });
+  // dedup de filiais por endereco nas chaves recem-preenchidas
+  CLIENTE_IDX.porLojaUF.forEach((v,k)=>CLIENTE_IDX.porLojaUF.set(k,filiaisUnicasPorEndereco(v)));
+}
+
 /* ---------- FORMULARIO ---------- */
 function populaFmUF(){
   const atual = $("fm-uf").value;
-  const ufs = valoresUnicos(CLIENTES.length ? CLIENTES.map(c=>c.estado) : UFS, "estado");
+  const ufs = valoresUnicos(UFS, "estado");  // lista fixa; base de clientes e sob demanda
   $("fm-uf").innerHTML = '<option value="">UF</option>' +
     ufs.map(u=>`<option value="${esc(u)}">${esc(u)}</option>`).join("");
   restaurarSelecaoNormalizada($("fm-uf"), atual, "estado");
@@ -889,13 +934,19 @@ $("fm-uf").onchange = () => {
     $("fm-loja-busca").placeholder = "Selecione o estado primeiro";
     return;
   }
-  if(!CLIENTES.length){
-    $("fm-loja-busca").disabled = true;
-    $("fm-loja-busca").placeholder = "Lista de clientes nao carregada";
-    return;
-  }
-  $("fm-loja-busca").disabled = false;
-  $("fm-loja-busca").placeholder = "Digite para buscar a loja...";
+  // busca as lojas desse estado sob demanda (nao baixa a base inteira)
+  $("fm-loja-busca").disabled = true;
+  $("fm-loja-busca").placeholder = "carregando lojas de " + uf + "...";
+  carregarLojasUF(uf).then(lista=>{
+    if($("fm-uf").value !== uf) return;  // usuario ja trocou de estado
+    if(!lista.length){
+      $("fm-loja-busca").disabled = true;
+      $("fm-loja-busca").placeholder = "Nenhuma loja nesse estado";
+      return;
+    }
+    $("fm-loja-busca").disabled = false;
+    $("fm-loja-busca").placeholder = "Digite para buscar a loja...";
+  });
 };
 
 function lojasDoEstado(){
@@ -960,30 +1011,39 @@ function enderecoCompleto(c){
 /* ---------- busca por CNPJ ---------- */
 function soDigitos(s){ return String(s||"").replace(/\D/g,""); }
 
-$("fm-cnpj").oninput = () => {
+$("fm-cnpj").oninput = debounce(async () => {
   const alvo = soDigitos($("fm-cnpj").value);
   const msg = $("fm-cnpj-msg");
   if(alvo.length < 14){ msg.style.display = "none"; return; }
-  // acha a filial exata pelo CNPJ
-  const c = CLIENTE_IDX.porCNPJ.get(alvo);
+  msg.style.display = "block";
+  msg.style.color = "var(--tx3)";
+  msg.textContent = "buscando CNPJ...";
+  let c = null;
+  try{
+    const r = await api("buscarCnpj", {cnpj:alvo}, 30000);
+    if(r && r.ok) c = r.cliente || null;
+  }catch(e){ /* trata abaixo */ }
+  // se o usuario continuou digitando, ignora resposta antiga
+  if(soDigitos($("fm-cnpj").value) !== alvo) return;
   if(!c){
-    msg.style.display = "block";
     msg.style.color = "var(--rd)";
     msg.textContent = "CNPJ nao encontrado na base de clientes.";
     return;
   }
+  // garante as lojas do estado carregadas (pra montar a cascata) e indexa o cliente
+  indexarClientesParciais([c]);
+  await carregarLojasUF(c.estado);
   // preenche a cascata: estado -> loja -> endereco
   $("fm-uf").value = estadoLimpo(c.estado);
   $("fm-loja-busca").disabled = false;
   selecionaLoja(c.loja);   // monta os enderecos da loja
-  // seleciona a filial exata deste CNPJ
   const filiais = filiaisDaLoja(c.estado,c.loja);
   const idx = filiais.findIndex(x => soDigitos(x.cnpj) === alvo);
   if(idx >= 0){ $("fm-end").value = String(idx); $("fm-end").onchange(); }
   msg.style.display = "block";
   msg.style.color = "var(--gr)";
-  msg.textContent = "✓ " + c.loja + " — " + c.cidade + "/" + c.estado;
-};
+  msg.textContent = "\u2713 " + c.loja + " \u2014 " + c.cidade + "/" + c.estado;
+}, 450);
 
 // preenche com a data de hoje ao abrir
 (function(){
