@@ -1210,43 +1210,69 @@ function enderecoCompleto(c){
 /* ---------- busca por CNPJ ---------- */
 function soDigitos(s){ return String(s||"").replace(/\D/g,""); }
 
+// seleciona no dropdown de endereco a filial que bate com o CNPJ digitado
+function selecionarFilialPorCnpj(alvo, c){
+  const filiais = filiaisDaLoja(c.estado, c.loja);
+  let idx = filiais.findIndex(x => soDigitos(x.cnpj) === alvo);
+  if(idx < 0 && filiais.length === 1) idx = 0;
+  if(idx >= 0){ $("fm-end").value = String(idx); $("fm-end").onchange(); }
+}
+
+// preenche a cascata estado->loja->endereco com o cliente ja em maos (sem esperar rede)
+function preencherCascataCnpj(alvo, c){
+  $("fm-uf").value = estadoLimpo(c.estado);
+  $("fm-loja-busca").disabled = false;
+  selecionaLoja(c.loja);
+  selecionarFilialPorCnpj(alvo, c);
+  const msg = $("fm-cnpj-msg");
+  msg.style.display = "block";
+  msg.style.color = "var(--gr)";
+  msg.textContent = "\u2713 " + c.loja + " \u2014 " + c.cidade + "/" + c.estado;
+}
+
 $("fm-cnpj").oninput = debounce(async () => {
   const alvo = soDigitos($("fm-cnpj").value);
   const msg = $("fm-cnpj-msg");
   if(alvo.length < 14){ msg.style.display = "none"; return; }
-  let c = null;
-  if(CNPJ_CACHE.has(alvo)){
-    c = CNPJ_CACHE.get(alvo);   // ja buscado nesta sessao: instantaneo
-  } else {
-    msg.style.display = "block";
-    msg.style.color = "var(--tx3)";
-    msg.textContent = "buscando CNPJ...";
-    try{
-      const r = await api("buscarCnpj", {cnpj:alvo}, 30000);
-      if(r && r.ok){ c = r.cliente || null; CNPJ_CACHE.set(alvo, c); }
-    }catch(e){ /* trata abaixo */ }
-    // se o usuario continuou digitando, ignora resposta antiga
-    if(soDigitos($("fm-cnpj").value) !== alvo) return;
+
+  // 1) caminho instantaneo: ja buscado nesta sessao, ou ja em memoria (estado carregado)
+  let c = CNPJ_CACHE.has(alvo) ? CNPJ_CACHE.get(alvo)
+        : (CLIENTE_IDX.porCNPJ.get(alvo) || null);
+
+  if(c){
+    indexarClientesParciais([c]);
+    preencherCascataCnpj(alvo, c);
+    return;   // nada de rede: instantaneo
   }
+
+  // 2) precisa buscar no servidor
+  msg.style.display = "block";
+  msg.style.color = "var(--tx3)";
+  msg.textContent = "buscando CNPJ...";
+  try{
+    const r = await api("buscarCnpj", {cnpj:alvo}, 30000);
+    if(r && r.ok){ c = r.cliente || null; CNPJ_CACHE.set(alvo, c); }
+  }catch(e){ /* trata abaixo */ }
+  // se o usuario continuou digitando, ignora resposta antiga
+  if(soDigitos($("fm-cnpj").value) !== alvo) return;
+
   if(!c){
     msg.style.color = "var(--rd)";
     msg.textContent = "CNPJ nao encontrado na base de clientes.";
     return;
   }
-  // garante as lojas do estado carregadas (pra montar a cascata) e indexa o cliente
+
+  // 3) preenche JA com o cliente retornado (nao espera as lojas do estado)
   indexarClientesParciais([c]);
-  await carregarLojasUF(c.estado);
-  // preenche a cascata: estado -> loja -> endereco
-  $("fm-uf").value = estadoLimpo(c.estado);
-  $("fm-loja-busca").disabled = false;
-  selecionaLoja(c.loja);   // monta os enderecos da loja
-  const filiais = filiaisDaLoja(c.estado,c.loja);
-  const idx = filiais.findIndex(x => soDigitos(x.cnpj) === alvo);
-  if(idx >= 0){ $("fm-end").value = String(idx); $("fm-end").onchange(); }
-  msg.style.display = "block";
-  msg.style.color = "var(--gr)";
-  msg.textContent = "\u2713 " + c.loja + " \u2014 " + c.cidade + "/" + c.estado;
-}, 450);
+  preencherCascataCnpj(alvo, c);
+
+  // 4) enriquecimento em segundo plano: traz as demais filiais do estado sem travar a tela
+  carregarLojasUF(c.estado).then(() => {
+    if(soDigitos($("fm-cnpj").value) !== alvo) return;   // ja trocou de CNPJ
+    if($("fm-loja").value !== c.loja) return;            // usuario mexeu na loja
+    selecionarFilialPorCnpj(alvo, c);
+  }).catch(()=>{});
+}, 150);
 
 // preenche com a data de hoje ao abrir
 (function(){
