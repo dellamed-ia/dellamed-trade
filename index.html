@@ -2345,6 +2345,20 @@ function renderLojas(){
     : valoresUnicos(programacoesVisita().map(p=>p.vendedor));
   preencheSelect("lj-vend", nomesVend, "Todos", "nome");
 
+  // So exibe a lista depois que um filtro for aplicado (evita renderizar a base inteira de uma vez)
+  const buscaAtiva = ($("lj-busca").value || "").trim();
+  const semFiltro = !uf && !cid && !seg && !vend && !buscaAtiva;
+  if(semFiltro){
+    $("lj-kpis").innerHTML = "";
+    window._LJ_GRUPOS = {};
+    $("lj-lista").innerHTML = `<div class="mono" style="text-align:center;padding:44px 20px;color:var(--tx3);font-size:13px;line-height:1.7">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6;margin-bottom:10px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      <div style="font-weight:700;color:var(--tx2);font-size:14px;letter-spacing:.02em">Aplique um filtro para ver as lojas</div>
+      <div style="margin-top:6px">Selecione <b>estado</b>, cidade, segmento ou vendedor — ou busque pelo nome da loja — para exibir a lista de lojas não visitadas.</div>
+    </div>`;
+    return;
+  }
+
   const visit = lojasVisitadasSet();
   const prog = progIndex();
 
