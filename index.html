@@ -64,6 +64,21 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 .lbl{display:block;font-size:11px;font-weight:600;color:var(--tx2);
   margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px}
+/* grupos de selecao do formulario */
+.fsec{margin-bottom:16px;padding-top:16px;border-top:1px solid var(--bd)}
+.fsec:first-of-type{border-top:none;padding-top:0}
+.qlbl{display:block;font-size:13px;font-weight:600;color:var(--tx);margin-bottom:9px}
+.chks{display:flex;flex-wrap:wrap;gap:8px}
+.chk{display:flex;align-items:center;gap:8px;padding:9px 13px;border-radius:8px;
+  border:1px solid var(--bd);background:var(--card2);cursor:pointer;font-size:13px;color:var(--tx2);
+  user-select:none;-webkit-user-select:none;transition:all .12s}
+.chk:hover{border-color:var(--azul)}
+.chk.on{border-color:var(--azul);background:rgba(139,184,232,.14);color:var(--tx);font-weight:600}
+.chk .bx{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--tx3);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--marinho)}
+.chk.on .bx{background:var(--azul);border-color:var(--azul)}
+.chk.radio .bx{border-radius:50%}
+.condbox{margin-top:12px;padding:14px;border-radius:8px;background:var(--card2);border:1px solid var(--bd)}
 .btn{padding:11px 30px;border-radius:8px;border:none;cursor:pointer;
   font-size:13px;font-weight:700;letter-spacing:.04em;
   background:var(--azul);color:var(--marinho)}
@@ -151,42 +166,54 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
     <!-- NOVO RELATO -->
     <section id="vw-novo">
       <div class="card" style="padding:24px">
-        <h2 style="margin:0 0 20px;font-size:15px;font-weight:700;letter-spacing:.04em">REGISTRAR VISITA</h2>
+        <h2 style="margin:0 0 20px;font-size:15px;font-weight:700;letter-spacing:.04em">REGISTRAR CONTATO</h2>
+
         <div style="margin-bottom:14px">
-          <label class="lbl">Vendedor</label>
+          <label class="lbl">Vendedor / Key Account / Representante</label>
           <div id="fm-vend" style="padding:11px 14px;border-radius:8px;border:1px solid var(--bd);
             background:var(--bg);color:var(--tx2);font-size:14px"></div>
         </div>
+
         <div style="margin-bottom:14px">
-          <label class="lbl">Data da visita</label>
+          <label class="lbl">Data do contato</label>
           <input id="fm-data" type="date" style="max-width:200px">
         </div>
-        <div style="margin-bottom:14px">
-          <label class="lbl">Buscar por CNPJ <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(opcional — preenche estado, loja e endereço)</span></label>
-          <div style="position:relative">
-            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input id="fm-cnpj" type="text" inputmode="numeric" autocomplete="off" placeholder="Digite ou cole o CNPJ" style="padding-left:34px">
+
+        <div class="fsec" style="border-top:none;padding-top:0;margin-bottom:16px">
+          <label class="qlbl">Tipo de contato <span style="color:var(--tx3);font-weight:400">(marque uma ou as duas)</span></label>
+          <div class="chks" id="fm-tipo">
+            <div class="chk" data-v="Presencial"><span class="bx">✓</span>Presencial</div>
+            <div class="chk" data-v="Ligação"><span class="bx">✓</span>Ligação</div>
           </div>
-          <div id="fm-cnpj-msg" style="font-size:11px;margin-top:5px;display:none"></div>
         </div>
-        <div style="display:grid;grid-template-columns:90px 1fr;gap:14px;margin-bottom:14px">
+
+        <div style="display:grid;grid-template-columns:110px 1fr;gap:14px;margin-bottom:14px">
           <div>
             <label class="lbl">Estado</label>
             <select id="fm-uf"><option value="">UF</option></select>
           </div>
           <div>
-            <label class="lbl">Loja</label>
+            <label class="lbl">Buscar por CNPJ <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
             <div style="position:relative">
-              <div style="position:relative">
-                <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input id="fm-loja-busca" type="text" autocomplete="off" placeholder="Selecione o estado primeiro"
-                  style="padding-left:34px" disabled>
-              </div>
-              <div id="fm-loja-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;right:0;margin-top:4px;
-                background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:6px;
-                max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
-              <input id="fm-loja" type="hidden">
+              <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="fm-cnpj" type="text" inputmode="numeric" autocomplete="off" placeholder="Digite ou cole o CNPJ" style="padding-left:34px">
             </div>
+          </div>
+        </div>
+        <div id="fm-cnpj-msg" style="font-size:11px;margin:-6px 0 14px;display:none"></div>
+
+        <div style="margin-bottom:14px">
+          <label class="lbl">Loja</label>
+          <div style="position:relative">
+            <div style="position:relative">
+              <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="fm-loja-busca" type="text" autocomplete="off" placeholder="Selecione o estado primeiro"
+                style="padding-left:34px" disabled>
+            </div>
+            <div id="fm-loja-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;right:0;margin-top:4px;
+              background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:6px;
+              max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+            <input id="fm-loja" type="hidden">
           </div>
         </div>
         <div id="fm-end-wrap" style="display:none;margin-bottom:14px">
@@ -195,11 +222,136 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
           <div id="fm-end-info" style="margin-top:8px;padding:10px 14px;border-radius:8px;background:var(--card2);
             border:1px solid var(--bd);font-size:13px;color:var(--tx2);line-height:1.6;display:none"></div>
         </div>
-        <label class="lbl">Relato da visita</label>
-        <textarea id="fm-texto" rows="5" style="resize:vertical;line-height:1.6"
-          placeholder="Escreva livremente: qual loja visitou, como estavam os produtos Dellamed, concorrentes, oportunidades, problemas..."></textarea>
-        <div style="margin-top:14px">
-          <label class="lbl">Nota da visita <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(0 a 10)</span></label>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px">
+          <div>
+            <label class="lbl">Nome do contato</label>
+            <input id="fm-contato" type="text" autocomplete="off" placeholder="Com quem falou">
+          </div>
+          <div>
+            <label class="lbl">Cargo</label>
+            <input id="fm-cargo" type="text" autocomplete="off" placeholder="Cargo/função">
+          </div>
+        </div>
+
+        <!-- Negocio imediato -->
+        <div class="fsec">
+          <label class="qlbl">Este contato gerou negócio imediato?</label>
+          <div class="chks" id="fm-negocio" data-radio="1">
+            <div class="chk radio" data-v="Sim"><span class="bx">●</span>Sim</div>
+            <div class="chk radio" data-v="Não"><span class="bx">●</span>Não</div>
+          </div>
+          <div id="fm-negocio-sim" class="condbox" style="display:none">
+            <label class="lbl">Valor do pedido fechado</label>
+            <input id="fm-valor-pedido" type="text" inputmode="numeric" placeholder="R$ 0,00" style="max-width:220px;margin-bottom:12px">
+            <label class="lbl">Produtos</label>
+            <textarea id="fm-prod-pedido" rows="2" style="resize:vertical" placeholder="Quais produtos entraram no pedido"></textarea>
+          </div>
+          <div id="fm-negocio-nao" class="condbox" style="display:none">
+            <label class="qlbl" style="font-size:12px">Existe proposta em andamento?</label>
+            <div class="chks" id="fm-proposta" data-radio="1">
+              <div class="chk radio" data-v="Sim"><span class="bx">●</span>Sim</div>
+              <div class="chk radio" data-v="Não"><span class="bx">●</span>Não</div>
+            </div>
+            <div id="fm-proposta-sim" style="display:none;margin-top:12px">
+              <label class="lbl">Produtos</label>
+              <textarea id="fm-prod-proposta" rows="2" style="resize:vertical;margin-bottom:12px" placeholder="Produtos da proposta"></textarea>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div>
+                  <label class="lbl">Valor estimado</label>
+                  <input id="fm-valor-proposta" type="text" inputmode="numeric" placeholder="R$ 0,00">
+                </div>
+                <div>
+                  <label class="lbl">Previsão</label>
+                  <input id="fm-data-proposta" type="date">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cliente inativo -->
+        <div class="fsec">
+          <label class="qlbl">O cliente está inativo?</label>
+          <div class="chks" id="fm-inativo" data-radio="1">
+            <div class="chk radio" data-v="Sim"><span class="bx">●</span>Sim</div>
+            <div class="chk radio" data-v="Não"><span class="bx">●</span>Não</div>
+            <div class="chk radio" data-v="Nunca comprou"><span class="bx">●</span>Nunca comprou</div>
+          </div>
+          <div id="fm-inativo-sim" class="condbox" style="display:none">
+            <label class="qlbl" style="font-size:12px">Por que parou de comprar? <span style="color:var(--tx3);font-weight:400">(pode marcar vários)</span></label>
+            <div class="chks" id="fm-motivos" style="flex-direction:column;gap:6px">
+              <div class="chk" data-v="Ainda possui estoque dos produtos que costuma comprar"><span class="bx">✓</span>Ainda possui estoque dos produtos que costuma comprar</div>
+              <div class="chk" data-v="Baixa saída dos produtos no ponto de venda"><span class="bx">✓</span>Baixa saída dos produtos no ponto de venda</div>
+              <div class="chk" data-v="Problemas anteriores com SAC"><span class="bx">✓</span>Problemas anteriores com SAC</div>
+              <div class="chk" data-v="Inadimplência ou restrição de crédito"><span class="bx">✓</span>Inadimplência ou restrição de crédito</div>
+              <div class="chk" data-v="Demora na entrega"><span class="bx">✓</span>Demora na entrega</div>
+              <div class="chk" data-v="Entrega incorreta"><span class="bx">✓</span>Entrega incorreta</div>
+              <div class="chk" data-v="Itens recebidos com avaria"><span class="bx">✓</span>Itens recebidos com avaria</div>
+              <div class="chk" data-v="Dificuldade de competir com preços online"><span class="bx">✓</span>Dificuldade de competir com preços praticados online</div>
+              <div class="chk" data-v="Preço ou condição comercial"><span class="bx">✓</span>Preço ou condição comercial</div>
+              <div class="chk" data-v="Passou a comprar de outra marca"><span class="bx">✓</span>Passou a comprar de outra marca</div>
+              <div class="chk" data-v="Cliente não informou"><span class="bx">✓</span>Cliente não informou</div>
+              <div class="chk" data-v="Outro"><span class="bx">✓</span>Outro — especificar</div>
+            </div>
+            <div style="margin-top:12px">
+              <label class="lbl">Detalhe os problemas e pendências <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
+              <textarea id="fm-detalhe" rows="3" style="resize:vertical" placeholder="Produtos, pedidos, protocolos de SAC, exemplos de preços online e providências necessárias"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Marcas mobilidade -->
+        <div class="fsec">
+          <label class="qlbl">Principais marcas em mobilidade <span style="color:var(--tx3);font-weight:400">(cadeiras de rodas, banho, andadores — pode marcar várias)</span></label>
+          <div class="chks" id="fm-mob">
+            <div class="chk" data-v="Dellamed"><span class="bx">✓</span>Dellamed</div>
+            <div class="chk" data-v="Hidrolight"><span class="bx">✓</span>Hidrolight</div>
+            <div class="chk" data-v="Mercur"><span class="bx">✓</span>Mercur</div>
+            <div class="chk" data-v="Supermedy"><span class="bx">✓</span>Supermedy</div>
+            <div class="chk" data-v="Ortobrás"><span class="bx">✓</span>Ortobrás</div>
+            <div class="chk" data-v="Ortomobil"><span class="bx">✓</span>Ortomobil</div>
+            <div class="chk" data-v="CDS"><span class="bx">✓</span>CDS</div>
+            <div class="chk" data-v="Jaguaribe"><span class="bx">✓</span>Jaguaribe</div>
+            <div class="chk" data-v="Prolife"><span class="bx">✓</span>Prolife</div>
+            <div class="chk" data-v="Outras"><span class="bx">✓</span>Outras</div>
+            <div class="chk" data-v="Não trabalha com a categoria"><span class="bx">✓</span>Não trabalha com a categoria</div>
+          </div>
+          <div id="fm-mob-outras-wrap" style="display:none;margin-top:10px">
+            <label class="lbl">Outras marcas de mobilidade</label>
+            <input id="fm-mob-outras" type="text" placeholder="Informe quais">
+          </div>
+        </div>
+
+        <!-- Marcas ortopedia -->
+        <div class="fsec">
+          <label class="qlbl">Principais marcas em ortopedia <span style="color:var(--tx3);font-weight:400">(pode marcar várias)</span></label>
+          <div class="chks" id="fm-orto">
+            <div class="chk" data-v="Dellamed"><span class="bx">✓</span>Dellamed</div>
+            <div class="chk" data-v="Hidrolight"><span class="bx">✓</span>Hidrolight</div>
+            <div class="chk" data-v="Mercur"><span class="bx">✓</span>Mercur</div>
+            <div class="chk" data-v="Kestal"><span class="bx">✓</span>Kestal</div>
+            <div class="chk" data-v="Chantal"><span class="bx">✓</span>Chantal</div>
+            <div class="chk" data-v="Moova"><span class="bx">✓</span>Moova</div>
+            <div class="chk" data-v="TakeCare"><span class="bx">✓</span>TakeCare</div>
+            <div class="chk" data-v="Salvapé"><span class="bx">✓</span>Salvapé</div>
+            <div class="chk" data-v="Outras"><span class="bx">✓</span>Outras</div>
+            <div class="chk" data-v="Não trabalha com a categoria"><span class="bx">✓</span>Não trabalha com a categoria</div>
+          </div>
+          <div id="fm-orto-outras-wrap" style="display:none;margin-top:10px">
+            <label class="lbl">Outras marcas de ortopedia</label>
+            <input id="fm-orto-outras" type="text" placeholder="Informe quais">
+          </div>
+        </div>
+
+        <div class="fsec">
+          <label class="qlbl">Relatos</label>
+          <textarea id="fm-texto" rows="4" style="resize:vertical;line-height:1.6"
+            placeholder="Escreva livremente o que achar relevante da visita/contato"></textarea>
+        </div>
+
+        <div class="fsec">
+          <label class="qlbl">Nota da visita <span style="color:var(--tx3);font-weight:400">(0 a 10)</span></label>
           <select id="fm-nota" style="max-width:160px">
             <option value="">Selecione...</option>
             <option value="0">0</option><option value="1">1</option><option value="2">2</option>
@@ -208,7 +360,8 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
             <option value="9">9</option><option value="10">10</option>
           </select>
         </div>
-        <button id="fm-enviar" class="btn" style="margin-top:14px">SALVAR RELATO</button>
+
+        <button id="fm-enviar" class="btn" style="margin-top:8px;width:100%;padding:14px">ENVIAR</button>
       </div>
       <div id="pendentes" style="margin-top:22px"></div>
     </section>
@@ -382,6 +535,17 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
     <div class="blink" style="width:10px;height:10px;border-radius:50%;background:var(--cy);
       box-shadow:0 0 14px var(--cy);margin:0 auto 14px"></div>
     <div id="ov-load-txt" class="mono" style="font-size:13px;color:var(--cy)">carregando...</div>
+  </div>
+</div>
+
+<div id="ov-envio" class="ovl hide">
+  <div class="card" style="padding:30px 28px;text-align:center;max-width:380px;width:100%">
+    <h3 id="env-titulo" style="font-size:14px;font-weight:700;margin:0 0 18px;letter-spacing:.06em">ENVIANDO...</h3>
+    <div style="height:10px;border-radius:6px;background:var(--card2);border:1px solid var(--bd);overflow:hidden;margin-bottom:12px">
+      <div id="env-barra" style="height:100%;width:0%;background:var(--azul);transition:width .3s"></div>
+    </div>
+    <div id="env-msg" style="font-size:12px;color:var(--tx2)">Preparando...</div>
+    <button id="env-ok" class="btn" style="padding:10px 40px;margin-top:20px;display:none" onclick="$('ov-envio').classList.add('hide')">OK</button>
   </div>
 </div>
 
@@ -597,6 +761,57 @@ function limparFormularioRelato(){
   $("fm-loja").value = ""; $("fm-loja-busca").value = "";
   $("fm-end-wrap").style.display = "none"; $("fm-end-info").style.display = "none";
   $("fm-cnpj").value = ""; $("fm-cnpj-msg").style.display = "none";
+  $("fm-contato").value = ""; $("fm-cargo").value = "";
+  ["fm-tipo","fm-negocio","fm-proposta","fm-inativo","fm-motivos","fm-mob","fm-orto"].forEach(g=>{
+    document.querySelectorAll("#"+g+" .chk.on").forEach(c=>c.classList.remove("on"));
+  });
+  ["fm-valor-pedido","fm-prod-pedido","fm-prod-proposta","fm-valor-proposta","fm-data-proposta",
+   "fm-detalhe","fm-mob-outras","fm-orto-outras"].forEach(id=>{ if($(id)) $(id).value=""; });
+  ["fm-negocio-sim","fm-negocio-nao","fm-proposta-sim","fm-inativo-sim",
+   "fm-mob-outras-wrap","fm-orto-outras-wrap"].forEach(id=>{ if($(id)) $(id).style.display="none"; });
+}
+
+/* ---------- GRUPOS DE SELECAO / CONDICIONAIS / MOEDA ---------- */
+function lerGrupo(id){
+  return [...document.querySelectorAll("#"+id+" .chk.on")].map(c=>c.getAttribute("data-v"));
+}
+function initFormNovo(){
+  // liga clique dos grupos (radio = escolha unica; senao multipla)
+  document.querySelectorAll("#vw-novo .chks").forEach(grp=>{
+    const radio = grp.getAttribute("data-radio")==="1";
+    grp.querySelectorAll(".chk").forEach(chk=>{
+      chk.onclick = () => {
+        if(radio){ grp.querySelectorAll(".chk").forEach(c=>c.classList.remove("on")); chk.classList.add("on"); }
+        else chk.classList.toggle("on");
+        aoMudarGrupo(grp.id);
+      };
+    });
+  });
+  // mascara de moeda
+  ["fm-valor-pedido","fm-valor-proposta"].forEach(id=>{ if($(id)) $(id).oninput = ()=>mascaraMoeda($(id)); });
+}
+function aoMudarGrupo(id){
+  if(id==="fm-negocio"){
+    const v = lerGrupo("fm-negocio")[0];
+    $("fm-negocio-sim").style.display = v==="Sim" ? "block" : "none";
+    $("fm-negocio-nao").style.display = v==="Não" ? "block" : "none";
+  } else if(id==="fm-proposta"){
+    const v = lerGrupo("fm-proposta")[0];
+    $("fm-proposta-sim").style.display = v==="Sim" ? "block" : "none";
+  } else if(id==="fm-inativo"){
+    const v = lerGrupo("fm-inativo")[0];
+    $("fm-inativo-sim").style.display = v==="Sim" ? "block" : "none";
+  } else if(id==="fm-mob"){
+    $("fm-mob-outras-wrap").style.display = lerGrupo("fm-mob").includes("Outras") ? "block" : "none";
+  } else if(id==="fm-orto"){
+    $("fm-orto-outras-wrap").style.display = lerGrupo("fm-orto").includes("Outras") ? "block" : "none";
+  }
+}
+function mascaraMoeda(el){
+  let n = el.value.replace(/\D/g,"");
+  if(!n){ el.value=""; return; }
+  n = (parseInt(n,10)/100).toLocaleString("pt-BR",{minimumFractionDigits:2, maximumFractionDigits:2});
+  el.value = "R$ " + n;
 }
 function alternaFila(id){
   if(FILA_ENVIANDO) return;
@@ -1291,11 +1506,36 @@ function isoParaBR(iso){
   return d + "/" + m + "/" + a;
 }
 
-$("fm-enviar").onclick = () => {
-  const uf = $("fm-uf").value, dt = isoParaBR($("fm-data").value), tx = $("fm-texto").value.trim();
+initFormNovo();
+
+function moedaParaNumero(s){
+  if(!s) return "";
+  const n = String(s).replace(/[^\d,]/g,"").replace(/\./g,"").replace(",",".");
+  return n ? n : "";
+}
+
+$("fm-enviar").onclick = async () => {
+  const uf = $("fm-uf").value, dt = isoParaBR($("fm-data").value);
   const nota = $("fm-nota").value;
-  if(!uf || !dt || !tx){ alert("Preencha estado, data e o relato."); return; }
-  if(nota === ""){ alert("Informe a nota da visita (0 a 10)."); return; }
+  const tipo = lerGrupo("fm-tipo");
+  const negocio = lerGrupo("fm-negocio")[0] || "";
+  const inativo = lerGrupo("fm-inativo")[0] || "";
+
+  // obrigatorios
+  if(!dt){ alert("Informe a data do contato."); return; }
+  if(!tipo.length){ alert("Marque o tipo de contato (Presencial e/ou Ligação)."); return; }
+  if(!negocio){ alert("Responda: este contato gerou negócio imediato?"); return; }
+  if(negocio==="Não"){
+    const prop = lerGrupo("fm-proposta")[0] || "";
+    if(!prop){ alert("Responda: existe proposta em andamento?"); return; }
+  }
+  if(!inativo){ alert("Responda: o cliente está inativo?"); return; }
+  if(inativo==="Sim" && !lerGrupo("fm-motivos").length){ alert("Marque ao menos um motivo pelo qual o cliente parou de comprar."); return; }
+  if(!lerGrupo("fm-mob").length){ alert("Marque as marcas de mobilidade (ou 'Não trabalha com a categoria')."); return; }
+  if(!lerGrupo("fm-orto").length){ alert("Marque as marcas de ortopedia (ou 'Não trabalha com a categoria')."); return; }
+  if(nota===""){ alert("Informe a nota da visita (0 a 10)."); return; }
+
+  // loja / endereco
   let loja="", cidade="", endereco="";
   const loSel = $("fm-loja").value, enSel = $("fm-end").value;
   if(loSel){
@@ -1305,21 +1545,57 @@ $("fm-enviar").onclick = () => {
     else if(filiais[0]){ cidade = filiais[0].cidade; }
   }
 
-  const item = {
-    id:idFilaLocal(),
-    criadoEm:new Date().toISOString(),
-    vendedor:(USER&&USER.nome)||"",
-    payload:{estado:uf, dataVisita:dt, texto:tx, loja, cidade, endereco, nota}
+  const payload = {
+    estado:uf, dataVisita:dt, texto:$("fm-texto").value.trim(), loja, cidade, endereco, nota,
+    tipoContato: tipo.join(" + "),
+    nomeContato: $("fm-contato").value.trim(),
+    cargoContato: $("fm-cargo").value.trim(),
+    negocioImediato: negocio,
+    valorPedido: moedaParaNumero($("fm-valor-pedido").value),
+    produtosPedido: $("fm-prod-pedido").value.trim(),
+    propostaAndamento: negocio==="Não" ? (lerGrupo("fm-proposta")[0]||"") : "",
+    produtosProposta: $("fm-prod-proposta").value.trim(),
+    valorProposta: moedaParaNumero($("fm-valor-proposta").value),
+    dataProposta: $("fm-data-proposta").value ? isoParaBR($("fm-data-proposta").value) : "",
+    clienteInativo: inativo,
+    motivosInativo: lerGrupo("fm-motivos").join(" | "),
+    detalheProblemas: $("fm-detalhe").value.trim(),
+    marcasMobilidade: lerGrupo("fm-mob").join(" | "),
+    outrasMobilidade: $("fm-mob-outras").value.trim(),
+    marcasOrtopedia: lerGrupo("fm-orto").join(" | "),
+    outrasOrtopedia: $("fm-orto-outras").value.trim()
   };
-  RELATOS_FILA.unshift(item);
-  salvarFilaLocal();
-  limparFormularioRelato();
-  renderPendentes();
 
-  // Feedback rapido, sem chamada ao servidor e sem bloquear o vendedor.
-  const btn=$("fm-enviar"), antigo=btn.textContent;
-  btn.textContent="SALVO ✓"; btn.disabled=true;
-  setTimeout(()=>{ btn.textContent=antigo; btn.disabled=false; },700);
+  // envio com barra de progresso
+  const ov=$("ov-envio"), barra=$("env-barra"), msg=$("env-msg"), okb=$("env-ok");
+  $("env-titulo").textContent="ENVIANDO...";
+  okb.style.display="none"; barra.style.width="15%"; msg.textContent="Enviando para o servidor...";
+  ov.classList.remove("hide");
+  let prog=15;
+  const timer=setInterval(()=>{ prog=Math.min(prog+7,88); barra.style.width=prog+"%"; },400);
+
+  try{
+    const r = await api("criar", Object.assign({}, payload, {clientDraftId:idFilaLocal()}), 90000);
+    clearInterval(timer);
+    if(r && r.ok){
+      barra.style.width="100%"; barra.style.background="var(--gr)";
+      $("env-titulo").textContent="ENVIADO"; msg.textContent="Contato registrado. Já está no Histórico.";
+      okb.style.display="inline-block";
+      limparFormularioRelato();
+      await atualizarDataset("relatos", true);
+      renderHist();
+    }else{
+      throw new Error((r&&r.erro)||"falha");
+    }
+  }catch(e){
+    clearInterval(timer);
+    // fallback: salva na fila local para reenvio
+    RELATOS_FILA.unshift({id:idFilaLocal(), criadoEm:new Date().toISOString(), vendedor:(USER&&USER.nome)||"", payload});
+    salvarFilaLocal(); renderPendentes();
+    barra.style.width="100%"; barra.style.background="var(--am)";
+    $("env-titulo").textContent="SALVO LOCALMENTE"; okb.style.display="inline-block";
+    msg.textContent="Sem conexão agora. Ficou salvo neste aparelho e você reenvia em 'Aguardando envio'.";
+  }
 };
 
 /* ---------- PENDENTES / FILA DE ENVIO ---------- */
@@ -1484,6 +1760,8 @@ function renderHist(){
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         <button class="nav" style="padding:5px 9px;font-size:10px" onclick="alternaHist('${r.id}',this)" title="Ver relato">${hAb?"\u25B2":"\u25BC"}</button>
+        ${!r.analisado ? `<button class="nav" style="font-size:10px;padding:4px 10px;border-color:rgba(139,184,232,.5);
+          background:rgba(139,184,232,.12);color:var(--cy)" onclick="reanalisar('${r.id}')">ENVIAR PARA ANÁLISE</button>` : ""}
         ${pode ? `<button class="nav" style="font-size:10px;padding:4px 10px"
           onclick="pedirExcluir('${r.id}')">EXCLUIR</button>` : ""}
       </div>
