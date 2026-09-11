@@ -248,6 +248,8 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
             <textarea id="fm-prod-pedido" rows="2" style="resize:vertical" placeholder="Quais produtos entraram no pedido"></textarea>
           </div>
           <div id="fm-negocio-nao" class="condbox" style="display:none">
+            <label class="lbl">Justificativa</label>
+            <textarea id="fm-justificativa" rows="2" style="resize:vertical;margin-bottom:12px" placeholder="Por que não gerou negócio imediato?"></textarea>
             <label class="qlbl" style="font-size:12px">Existe proposta em andamento?</label>
             <div class="chks" id="fm-proposta" data-radio="1">
               <div class="chk radio" data-v="Sim"><span class="bx">●</span>Sim</div>
@@ -304,7 +306,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
         <!-- Marcas mobilidade -->
         <div class="fsec">
           <label class="qlbl">Principais marcas em mobilidade <span style="color:var(--tx3);font-weight:400">(cadeiras de rodas, banho, andadores — pode marcar várias)</span></label>
-          <div class="chks" id="fm-mob">
+          <div class="chks" id="fm-mob" style="flex-direction:column;gap:6px;text-transform:uppercase">
             <div class="chk" data-v="Dellamed"><span class="bx">✓</span>Dellamed</div>
             <div class="chk" data-v="Hidrolight"><span class="bx">✓</span>Hidrolight</div>
             <div class="chk" data-v="Mercur"><span class="bx">✓</span>Mercur</div>
@@ -326,7 +328,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
         <!-- Marcas ortopedia -->
         <div class="fsec">
           <label class="qlbl">Principais marcas em ortopedia <span style="color:var(--tx3);font-weight:400">(pode marcar várias)</span></label>
-          <div class="chks" id="fm-orto">
+          <div class="chks" id="fm-orto" style="flex-direction:column;gap:6px;text-transform:uppercase">
             <div class="chk" data-v="Dellamed"><span class="bx">✓</span>Dellamed</div>
             <div class="chk" data-v="Hidrolight"><span class="bx">✓</span>Hidrolight</div>
             <div class="chk" data-v="Mercur"><span class="bx">✓</span>Mercur</div>
@@ -368,6 +370,14 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 
     <!-- HISTORICO -->
     <section id="vw-hist" class="hide">
+      <div class="card" style="padding:12px 16px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div><label class="lbl" style="font-size:10px">Período</label>
+          <select id="hs-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('hs', renderHist)"></select></div>
+        <div class="hs-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="hs-de" type="date" style="padding:7px 10px;font-size:13px"></div>
+        <div class="hs-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="hs-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
+        <div><label class="lbl" style="font-size:10px">Time</label><select id="hs-time" style="padding:7px 10px;font-size:13px"></select></div>
+        <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="hs-vend" style="padding:7px 10px;font-size:13px"></select></div>
+      </div>
       <div class="card" style="padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center">
         <span style="color:var(--tx3)">/</span>
         <input id="hs-busca" type="text" placeholder="Buscar por palavra, data, vendedor, loja..."
@@ -382,9 +392,12 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
     <section id="vw-rel" class="hide">
       <div class="card" style="padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;
         flex-wrap:wrap;align-items:flex-end">
-        <div><label class="lbl" style="font-size:10px">De</label><input id="ft-de" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div><label class="lbl" style="font-size:10px">Ate</label><input id="ft-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div><label class="lbl" style="font-size:10px">Vendedor</label><select id="ft-vend" style="padding:7px 10px;font-size:13px"></select></div>
+        <div><label class="lbl" style="font-size:10px">Período</label>
+          <select id="ft-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('ft', renderRel)"></select></div>
+        <div class="ft-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="ft-de" type="date" style="padding:7px 10px;font-size:13px"></div>
+        <div class="ft-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="ft-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
+        <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="ft-vend" style="padding:7px 10px;font-size:13px"></select></div>
+        <div><label class="lbl" style="font-size:10px">Time</label><select id="ft-time" style="padding:7px 10px;font-size:13px"></select></div>
         <div><label class="lbl" style="font-size:10px">Estado</label><select id="ft-uf" style="padding:7px 10px;font-size:13px"></select></div>
         <div><label class="lbl" style="font-size:10px">Faixa de nota</label><select id="ft-sent" style="padding:7px 10px;font-size:13px">
           <option value="">Todas</option><option value="alta">Alta (7-10)</option>
@@ -466,12 +479,15 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
     <!-- LOJAS NAO VISITADAS -->
     <section id="vw-lojas" class="hide">
       <div class="card" style="padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-        <div><label class="lbl" style="font-size:10px">De</label><input id="lj-de" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div><label class="lbl" style="font-size:10px">Ate</label><input id="lj-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
+        <div><label class="lbl" style="font-size:10px">Período</label>
+          <select id="lj-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('lj', renderLojas)"></select></div>
+        <div class="lj-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="lj-de" type="date" style="padding:7px 10px;font-size:13px"></div>
+        <div class="lj-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="lj-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
         <div><label class="lbl" style="font-size:10px">Estado</label><select id="lj-uf" style="padding:7px 10px;font-size:13px"></select></div>
         <div><label class="lbl" style="font-size:10px">Cidade</label><select id="lj-cidade" style="padding:7px 10px;font-size:13px"></select></div>
         <div><label class="lbl" style="font-size:10px">Segmento</label><select id="lj-seg" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Vendedor</label><select id="lj-vend" style="padding:7px 10px;font-size:13px"></select></div>
+        <div><label class="lbl" style="font-size:10px">Time</label><select id="lj-time" style="padding:7px 10px;font-size:13px"></select></div>
+        <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="lj-vend" style="padding:7px 10px;font-size:13px"></select></div>
         <button class="nav" id="lj-limpar" title="Limpar" style="padding:7px 10px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -491,12 +507,15 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
     <!-- PROGRAMACAO -->
     <section id="vw-prog" class="hide">
       <div class="card" style="padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-        <div><label class="lbl" style="font-size:10px">De</label><input id="pg-de" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div><label class="lbl" style="font-size:10px">Ate</label><input id="pg-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
+        <div><label class="lbl" style="font-size:10px">Período</label>
+          <select id="pg-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('pg', renderProg)"></select></div>
+        <div class="pg-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="pg-de" type="date" style="padding:7px 10px;font-size:13px"></div>
+        <div class="pg-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="pg-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
         <div><label class="lbl" style="font-size:10px">Estado</label><select id="pg-uf" style="padding:7px 10px;font-size:13px"></select></div>
         <div><label class="lbl" style="font-size:10px">Cidade</label><select id="pg-cidade" style="padding:7px 10px;font-size:13px"></select></div>
         <div><label class="lbl" style="font-size:10px">Segmento</label><select id="pg-seg" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Vendedor</label><select id="pg-vend" style="padding:7px 10px;font-size:13px"></select></div>
+        <div><label class="lbl" style="font-size:10px">Time</label><select id="pg-time" style="padding:7px 10px;font-size:13px"></select></div>
+        <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="pg-vend" style="padding:7px 10px;font-size:13px"></select></div>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx2);cursor:pointer;padding-bottom:6px">
           <input type="checkbox" id="pg-soanota" style="width:15px;height:15px;padding:0;accent-color:var(--rd);cursor:pointer">
           <span style="color:var(--rd);font-weight:700">!</span> so com anotacao
@@ -733,6 +752,8 @@ let LOJA_FILTRO = "";
 let CLIENTES = [];        // aba CLIENTES
 let PROGRAMACOES = [];    // aba PROGRAMACAO
 let VENDEDORES = [];      // usuarios (admin usa pra programar em nome de outro)
+let TIMES_MAP = {};       // email/nome (minusculo) -> time
+let TIMES_LIST = [];      // times distintos (para os filtros)
 let PROG_EDIT = null;     // contexto do popup de programacao
 let ATV_EDIT_ID = null;   // atividade avulsa em edicao (armazenada junto das programacoes)
 const ATV_COD = "__ATIVIDADE_AVULSA_V1__";
@@ -765,7 +786,7 @@ function limparFormularioRelato(){
   ["fm-tipo","fm-negocio","fm-proposta","fm-inativo","fm-motivos","fm-mob","fm-orto"].forEach(g=>{
     document.querySelectorAll("#"+g+" .chk.on").forEach(c=>c.classList.remove("on"));
   });
-  ["fm-valor-pedido","fm-prod-pedido","fm-prod-proposta","fm-valor-proposta","fm-data-proposta",
+  ["fm-valor-pedido","fm-prod-pedido","fm-justificativa","fm-prod-proposta","fm-valor-proposta","fm-data-proposta",
    "fm-detalhe","fm-mob-outras","fm-orto-outras"].forEach(id=>{ if($(id)) $(id).value=""; });
   ["fm-negocio-sim","fm-negocio-nao","fm-proposta-sim","fm-inativo-sim",
    "fm-mob-outras-wrap","fm-orto-outras-wrap"].forEach(id=>{ if($(id)) $(id).style.display="none"; });
@@ -1199,7 +1220,7 @@ async function iniciar(){
   $("app").classList.remove("hide");
   $("hd-nome").textContent = USER.nome;
   const adm = USER.role === "admin";
-  $("hd-role").textContent = adm ? "ADMINISTRADORA" : "VENDEDOR";
+  $("hd-role").textContent = adm ? "ADMIN" : "VENDEDOR";
   $("hd-role").style.color = adm ? "var(--am)" : "var(--tx3)";
   $("fm-vend").textContent = USER.nome;
   $("ft-excel").classList.toggle("hide", !adm);
@@ -1208,9 +1229,11 @@ async function iniciar(){
   // Mostra dados locais imediatamente; consulta somente o que a tela inicial precisa.
   const tinhaCache = hidratarCache();
   carregarFilaLocal();
+  preenchePeriodos();
   populaFmUF(); renderPendentes(); renderHist(); renderNotificacoes();
+  // carrega usuarios/times em segundo plano (para filtros de Time e nomes)
+  atualizarDataset("vendedores", true).then(()=>{ construirTimes(); redesenharVisivel(); });
   // NAO baixa mais a base de clientes (33MB) no login. CNPJ e lojas sao sob demanda.
-  // A base completa so carrega quando o usuario abre a aba "Lojas nao visitadas".
   const precisaBloquear = !RELATOS.length;
   if(precisaBloquear) load("carregando...");
   await atualizarDataset("relatos", true);
@@ -1551,6 +1574,7 @@ $("fm-enviar").onclick = async () => {
     nomeContato: $("fm-contato").value.trim(),
     cargoContato: $("fm-cargo").value.trim(),
     negocioImediato: negocio,
+    justificativaNegocio: negocio==="Não" ? $("fm-justificativa").value.trim() : "",
     valorPedido: moedaParaNumero($("fm-valor-pedido").value),
     produtosPedido: $("fm-prod-pedido").value.trim(),
     propostaAndamento: negocio==="Não" ? (lerGrupo("fm-proposta")[0]||"") : "",
@@ -1683,9 +1707,21 @@ function podeExcluir(r){ return USER.role === "admin" || r.owner === CRED.email.
 
 function listaFiltrada(){
   const q = $("hs-busca").value.toLowerCase().trim();
-  const base = !q ? RELATOS : RELATOS.filter(r => (
+  const de = $("hs-de") ? $("hs-de").value : "";
+  const ate = $("hs-ate") ? $("hs-ate").value : "";
+  const vt = $("hs-time") ? $("hs-time").value : "";
+  const vv = $("hs-vend") ? $("hs-vend").value : "";
+  let base = RELATOS.filter(r => {
+    if(vv && !mesmoFiltro(r.vendedor, vv)) return false;
+    if(vt && timeDe(r.vendedor, r.owner) !== vt) return false;
+    const d = new Date(r.data);
+    if(de && d < new Date(de)) return false;
+    if(ate){ const t = new Date(ate); t.setHours(23,59,59); if(d > t) return false; }
+    return true;
+  });
+  if(q) base = base.filter(r => (
     [r.vendedor,r.estado,r.loja,r.cidade,r.insights,r.acaoSugerida,r.textoOriginal,dtBR(r.data)]
-      .concat(r.oportunidades,r.perdas,r.insights,r.produtos,r.concorrentes)
+      .concat(r.oportunidades||[],r.perdas||[],r.produtos||[],r.concorrentes||[])
       .join(" ").toLowerCase().includes(q)
   ));
   // mais recente para o mais antigo (usa criadoEm; se faltar, usa data)
@@ -1696,6 +1732,9 @@ function listaFiltrada(){
 }
 
 function renderHist(){
+  // popula filtros do historico
+  preencheVendedor("hs-vend", valoresUnicos(RELATOS.map(r=>r.vendedor), "nome"));
+  preencheTime("hs-time");
   const lista = listaFiltrada();
   $("hs-count").textContent = lista.length + (lista.length === 1 ? " resultado" : " resultados");
 
@@ -1836,14 +1875,17 @@ $("del-sim").onclick = async () => {
 };
 
 /* ---------- RELATORIO ---------- */
-["ft-de","ft-ate","ft-vend","ft-uf","ft-sent"].forEach(id => $(id).onchange = renderRel);
+["ft-de","ft-ate","ft-vend","ft-uf","ft-sent","ft-time"].forEach(id => { if($(id)) $(id).onchange = renderRel; });
 $("ft-limpar").onclick = () => {
-  ["ft-de","ft-ate","ft-vend","ft-uf","ft-sent"].forEach(id => $(id).value = "");
+  ["ft-vend","ft-uf","ft-sent","ft-time"].forEach(id => { if($(id)) $(id).value = ""; });
+  if($("ft-per")){ $("ft-per").value="mes"; aplicaPeriodoValor("ft"); }
   LOJA_FILTRO = ""; FT_SEG.clear(); FT_LOJA.clear();
   if($("ft-loja-busca")) $("ft-loja-busca").value = "";
   renderRel();
 };
 $("ft-atualizar").onclick = () => recarregar();
+// filtros do historico
+["hs-vend","hs-time","hs-de","hs-ate"].forEach(id => { if($(id)) $(id).onchange = renderHist; });
 
 /* dropdowns de filtro (segmento e loja) */
 function toggleDrop(id){
@@ -1935,14 +1977,86 @@ function segmentoDaLoja(loja, estado){
   return CLIENTE_IDX.segmento.get(chaveLoja(estado,loja)) || "";
 }
 
+/* ============================================================
+   PERIODO (mes atual / 7,15,30,60,90 dias / mes anterior / personalizado)
+   + TIME (aba TIME: usuario -> time)
+   ============================================================ */
+const PERIODOS = [
+  ["mes","Mês atual"],["7","Últimos 7 dias"],["15","Últimos 15 dias"],
+  ["30","Últimos 30 dias"],["60","Últimos 60 dias"],["90","Últimos 90 dias"],
+  ["anterior","Mês anterior"],["perso","Personalizado"]
+];
+function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function rangePeriodo(v){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  if(v==="mes"){ return [new Date(hoje.getFullYear(),hoje.getMonth(),1), new Date(hoje.getFullYear(),hoje.getMonth()+1,0)]; }
+  if(v==="anterior"){ return [new Date(hoje.getFullYear(),hoje.getMonth()-1,1), new Date(hoje.getFullYear(),hoje.getMonth(),0)]; }
+  if(["7","15","30","60","90"].includes(v)){ const de=new Date(hoje); de.setDate(de.getDate()-(parseInt(v,10)-1)); return [de,hoje]; }
+  return [null,null]; // personalizado
+}
+function preenchePeriodos(){
+  ["ft","lj","pg","hs"].forEach(pre=>{
+    const sel=$(pre+"-per"); if(!sel) return;
+    if(!sel.options.length){ sel.innerHTML = PERIODOS.map(([v,l])=>`<option value="${v}">${l}</option>`).join(""); }
+    if(!sel.value) sel.value="mes";
+    aplicaPeriodoValor(pre); // ajusta de/ate sem re-render
+  });
+}
+function aplicaPeriodoValor(pre){
+  const v=$(pre+"-per").value;
+  const perso = v==="perso";
+  document.querySelectorAll("."+pre+"-perso").forEach(el=>el.style.display = perso?"":"none");
+  if(!perso){
+    const [de,ate]=rangePeriodo(v);
+    if($(pre+"-de")) $(pre+"-de").value = de?isoLocal(de):"";
+    if($(pre+"-ate")) $(pre+"-ate").value = ate?isoLocal(ate):"";
+  }
+}
+function aplicaPeriodo(pre, fn){ aplicaPeriodoValor(pre); if(fn) fn(); }
+
+function construirTimes(){
+  TIMES_MAP={}; const set=new Set();
+  VENDEDORES.forEach(v=>{
+    if(v.time){
+      if(v.email) TIMES_MAP[String(v.email).toLowerCase()]=v.time;
+      if(v.nome) TIMES_MAP[String(v.nome).toLowerCase()]=v.time;
+      set.add(v.time);
+    }
+  });
+  TIMES_LIST=[...set].sort();
+}
+function timeDe(nome, email){
+  return TIMES_MAP[String(email||"").toLowerCase()] || TIMES_MAP[String(nome||"").toLowerCase()] || "";
+}
+function preencheTime(id){
+  const sel=$(id); if(!sel) return; const atual=sel.value;
+  sel.innerHTML = `<option value="">Todos os times</option>` + TIMES_LIST.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  sel.value = atual;
+}
+// vendedor: admin ve todos; nao-admin fica travado no proprio nome
+function preencheVendedor(id, nomes){
+  const sel=$(id); if(!sel) return;
+  const adm = USER && USER.role==="admin";
+  if(!adm){
+    sel.innerHTML = `<option value="${esc(USER.nome)}">${esc(USER.nome)}</option>`;
+    sel.value = USER.nome; sel.disabled = true;
+    return;
+  }
+  const atual=sel.value;
+  sel.disabled=false;
+  sel.innerHTML = `<option value="">Todos</option>` + nomes.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  sel.value = atual;
+}
+
 function filtrados(ignoreLoja){
   const de = $("ft-de").value, ate = $("ft-ate").value;
   const v = $("ft-vend").value, u = $("ft-uf").value;
-  const s = $("ft-sent").value;
+  const s = $("ft-sent").value, vt = $("ft-time") ? $("ft-time").value : "";
   const lj = ignoreLoja ? "" : LOJA_FILTRO;
   return RELATOS.filter(r => {
     if(!r.analisado) return false;
     if(v && !mesmoFiltro(r.vendedor, v)) return false;
+    if(vt && timeDe(r.vendedor, r.owner) !== vt) return false;
     if(u && !mesmoFiltro(r.estado, u)) return false;
     if(lj && !mesmoFiltro(r.loja, lj)) return false;
     if(s && classeDe(r) !== s) return false;
@@ -2037,12 +2151,14 @@ function filtrarLoja(lj){
 
 function renderRel(){
   // opcoes dos filtros simples
-  [["ft-vend","vendedor","nome"],["ft-uf","estado","estado"]].forEach(([id,campo,tipo]) => {
-    const atual = $(id).value;
-    const vals = valoresUnicos(RELATOS.map(r => r[campo]), tipo);
-    $(id).innerHTML = `<option value="">Todos</option>` + vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
-    restaurarSelecaoNormalizada($(id), atual, tipo);
-  });
+  {
+    const atual = $("ft-uf").value;
+    const vals = valoresUnicos(RELATOS.map(r => r.estado), "estado");
+    $("ft-uf").innerHTML = `<option value="">Todos</option>` + vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    restaurarSelecaoNormalizada($("ft-uf"), atual, "estado");
+  }
+  preencheVendedor("ft-vend", valoresUnicos(RELATOS.map(r=>r.vendedor), "nome"));
+  preencheTime("ft-time");
 
   // filtros: segmento (dos clientes visitados) e loja (com busca)
   const analisados = RELATOS.filter(r=>r.analisado);
@@ -2621,37 +2737,31 @@ function primeiroEUltimoDiaDoMes(){
   return [iso(p), iso(u)];
 }
 
-["lj-de","lj-ate","lj-uf","lj-cidade","lj-seg","lj-vend"].forEach(id => $(id).onchange = renderLojas);
+["lj-de","lj-ate","lj-uf","lj-cidade","lj-seg","lj-vend","lj-time"].forEach(id => { if($(id)) $(id).onchange = renderLojas; });
 $("lj-busca").oninput = debounce(renderLojas,150);
 $("lj-limpar").onclick = () => {
-  const [p,u] = primeiroEUltimoDiaDoMes();
-  $("lj-de").value = p; $("lj-ate").value = u;
-  ["lj-uf","lj-cidade","lj-seg","lj-vend"].forEach(id=>$(id).value="");
+  if($("lj-per")){ $("lj-per").value="mes"; aplicaPeriodoValor("lj"); }
+  ["lj-uf","lj-cidade","lj-seg","lj-vend","lj-time"].forEach(id=>{ if($(id)) $(id).value=""; });
   $("lj-busca").value = "";
   renderLojas();
 };
 
 function renderLojas(){
-  // datas default = mes atual (na primeira vez)
-  if(!$("lj-de").value){ const [p,u]=primeiroEUltimoDiaDoMes(); $("lj-de").value=p; $("lj-ate").value=u; }
-
+  // periodo ja cuida de lj-de/lj-ate; garante default na 1a vez
+  if(!$("lj-de").value && $("lj-per")){ aplicaPeriodoValor("lj"); }
+  preencheVendedor("lj-vend", (VENDEDORES.length?VENDEDORES.map(v=>v.nome):valoresUnicos(PROGRAMACOES.map(p=>p.vendedor),"nome")));
+  preencheTime("lj-time");
+  const timeF = $("lj-time") ? $("lj-time").value : "";
   const uf=$("lj-uf").value, cid=$("lj-cidade").value, seg=$("lj-seg").value, vend=$("lj-vend").value;
   const de=$("lj-de").value, ate=$("lj-ate").value;
-
-  // filtros
   preencheSelect("lj-uf", CLIENTES.map(c=>c.estado), "Todos", "estado");
   const baseCid = uf ? CLIENTES.filter(c=>mesmoFiltro(c.estado,uf)) : CLIENTES;
   preencheSelect("lj-cidade", baseCid.map(c=>c.cidade), "Todas");
   preencheSelect("lj-seg", CLIENTES.map(c=>c.segmento), "Todos");
-  // filtro de vendedor: usa a lista completa de vendedores; se nao houver, cai pros que ja programaram
-  const nomesVend = VENDEDORES.length
-    ? VENDEDORES.filter(v=>v.role==="vendedor").map(v=>v.nome)
-    : valoresUnicos(programacoesVisita().map(p=>p.vendedor));
-  preencheSelect("lj-vend", nomesVend, "Todos", "nome");
 
   // So exibe a lista depois que um filtro for aplicado (evita renderizar a base inteira de uma vez)
   const buscaAtiva = ($("lj-busca").value || "").trim();
-  const semFiltro = !uf && !cid && !seg && !vend && !buscaAtiva;
+  const semFiltro = !uf && !cid && !seg && !vend && !timeF && !buscaAtiva;
   if(semFiltro){
     $("lj-kpis").innerHTML = "";
     window._LJ_GRUPOS = {};
@@ -2691,6 +2801,9 @@ function renderLojas(){
   };
   if(vend){
     lista = lista.filter(g => { const o = prog[chaveLoja(g.estado,g.loja)]; return o && o.lista.some(p=>mesmoFiltro(p.vendedor,vend)); });
+  }
+  if(timeF){
+    lista = lista.filter(g => { const o = prog[chaveLoja(g.estado,g.loja)]; return o && o.lista.some(p=>timeDe(p.vendedor,p.owner)===timeF); });
   }
   // busca por nome da loja
   const busca = ($("lj-busca").value||"").toLowerCase().trim();
@@ -3003,12 +3116,13 @@ $("lj-excel").onclick = async () => {
 /* ============================================================
    PROGRAMACAO (listagem editavel)
    ============================================================ */
-["pg-uf","pg-cidade","pg-seg","pg-vend","pg-soanota"].forEach(id => { $(id).onchange = renderProg; });
+["pg-uf","pg-cidade","pg-seg","pg-vend","pg-soanota","pg-time"].forEach(id => { if($(id)) $(id).onchange = renderProg; });
 $("pg-pesquisar").onclick = renderProg;
 $("pg-de").onchange = renderProg;
 $("pg-ate").onchange = renderProg;
 $("pg-limpar").onclick = () => {
-  ["pg-de","pg-ate","pg-uf","pg-cidade","pg-seg","pg-vend"].forEach(id=>$(id).value="");
+  if($("pg-per")){ $("pg-per").value="mes"; aplicaPeriodoValor("pg"); }
+  ["pg-uf","pg-cidade","pg-seg","pg-vend","pg-time"].forEach(id=>{ if($(id)) $(id).value=""; });
   $("pg-soanota").checked = false;
   renderProg();
 };
@@ -3018,8 +3132,10 @@ function segmentoDaProg(p){
 }
 
 function renderProg(){
+  if(!$("pg-de").value && $("pg-per")){ aplicaPeriodoValor("pg"); }
   const de=$("pg-de").value, ate=$("pg-ate").value;
   const uf=$("pg-uf").value, cid=$("pg-cidade").value, seg=$("pg-seg").value, vend=$("pg-vend").value;
+  const timeF = $("pg-time") ? $("pg-time").value : "";
   const soAnota = $("pg-soanota").checked;
   const adm = USER && USER.role==="admin";
 
@@ -3030,10 +3146,8 @@ function renderProg(){
   const baseCid = uf ? universo.filter(p=>mesmoFiltro(p.estado,uf)) : universo;
   preencheSelect("pg-cidade", baseCid.map(p=>p.cidade), "Todas");
   preencheSelect("pg-seg", universo.map(p=>segmentoDaProg(p)), "Todos");
-  const nomesVendPg = VENDEDORES.length
-    ? VENDEDORES.filter(v=>v.role==="vendedor").map(v=>v.nome)
-    : valoresUnicos(universo.map(p=>p.vendedor));
-  preencheSelect("pg-vend", nomesVendPg, "Todos", "nome");
+  preencheVendedor("pg-vend", (VENDEDORES.length?VENDEDORES.map(v=>v.nome):valoresUnicos(universo.map(p=>p.vendedor),"nome")));
+  preencheTime("pg-time");
 
   let lista = universo.filter(p => {
     const d = new Date(p.dataProgramada);
@@ -3042,6 +3156,7 @@ function renderProg(){
     if(uf && !mesmoFiltro(p.estado,uf)) return false;
     if(cid && !mesmoFiltro(p.cidade,cid)) return false;
     if(vend && !mesmoFiltro(p.vendedor,vend)) return false;
+    if(timeF && timeDe(p.vendedor,p.owner)!==timeF) return false;
     if(seg && !mesmoFiltro(segmentoDaProg(p),seg)) return false;
     if(soAnota && !(p.anotacao||"").trim()) return false;
     return true;
@@ -3339,7 +3454,7 @@ function renderDia(){
         $("app").classList.remove("hide");
         $("hd-nome").textContent = USER.nome;
         const adm = USER.role === "admin";
-        $("hd-role").textContent = adm ? "ADMINISTRADORA" : "VENDEDOR";
+        $("hd-role").textContent = adm ? "ADMIN" : "VENDEDOR";
         $("hd-role").style.color = adm ? "var(--am)" : "var(--tx3)";
         $("fm-vend").textContent = USER.nome;
         $("ft-excel").classList.toggle("hide", !adm);
