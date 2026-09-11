@@ -79,6 +79,12 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 .chk.on .bx{background:var(--azul);border-color:var(--azul)}
 .chk.radio .bx{border-radius:50%}
 .condbox{margin-top:12px;padding:14px;border-radius:8px;background:var(--card2);border:1px solid var(--bd)}
+/* barra de filtros: campos alinhados lado a lado, uniformes */
+.fbar{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:end}
+.fbar > div{flex:1 1 160px;min-width:150px}
+.fbar > div > select, .fbar > div > input{width:100%}
+.fbar > button{flex:0 0 auto;align-self:end}
+.fbar > label{flex:0 0 auto;align-self:end}
 .btn{padding:11px 30px;border-radius:8px;border:none;cursor:pointer;
   font-size:13px;font-weight:700;letter-spacing:.04em;
   background:var(--azul);color:var(--marinho)}
@@ -316,6 +322,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
             <div class="chk" data-v="CDS"><span class="bx">✓</span>CDS</div>
             <div class="chk" data-v="Jaguaribe"><span class="bx">✓</span>Jaguaribe</div>
             <div class="chk" data-v="Prolife"><span class="bx">✓</span>Prolife</div>
+            <div class="chk" data-v="Winner"><span class="bx">✓</span>Winner</div>
             <div class="chk" data-v="Outras"><span class="bx">✓</span>Outras</div>
             <div class="chk" data-v="Não trabalha com a categoria"><span class="bx">✓</span>Não trabalha com a categoria</div>
           </div>
@@ -370,7 +377,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 
     <!-- HISTORICO -->
     <section id="vw-hist" class="hide">
-      <div class="card" style="padding:12px 16px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="card fbar" style="padding:12px 16px;margin-bottom:12px">
         <div><label class="lbl" style="font-size:10px">Período</label>
           <select id="hs-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('hs', renderHist)"></select></div>
         <div class="hs-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="hs-de" type="date" style="padding:7px 10px;font-size:13px"></div>
@@ -390,8 +397,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 
     <!-- RELATORIO -->
     <section id="vw-rel" class="hide">
-      <div class="card" style="padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;
-        flex-wrap:wrap;align-items:flex-end">
+      <div class="card fbar" style="padding:12px 16px;margin-bottom:16px">
         <div><label class="lbl" style="font-size:10px">Período</label>
           <select id="ft-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('ft', renderRel)"></select></div>
         <div class="ft-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="ft-de" type="date" style="padding:7px 10px;font-size:13px"></div>
@@ -478,7 +484,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 
     <!-- LOJAS NAO VISITADAS -->
     <section id="vw-lojas" class="hide">
-      <div class="card" style="padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="card fbar" style="padding:12px 16px;margin-bottom:16px">
         <div><label class="lbl" style="font-size:10px">Período</label>
           <select id="lj-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('lj', renderLojas)"></select></div>
         <div class="lj-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="lj-de" type="date" style="padding:7px 10px;font-size:13px"></div>
@@ -506,7 +512,7 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 
     <!-- PROGRAMACAO -->
     <section id="vw-prog" class="hide">
-      <div class="card" style="padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="card fbar" style="padding:12px 16px;margin-bottom:16px">
         <div><label class="lbl" style="font-size:10px">Período</label>
           <select id="pg-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('pg', renderProg)"></select></div>
         <div class="pg-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="pg-de" type="date" style="padding:7px 10px;font-size:13px"></div>
@@ -1733,6 +1739,7 @@ function listaFiltrada(){
 
 function renderHist(){
   // popula filtros do historico
+  garantePeriodo("hs");
   preencheVendedor("hs-vend", valoresUnicos(RELATOS.map(r=>r.vendedor), "nome"));
   preencheTime("hs-time");
   const lista = listaFiltrada();
@@ -1983,24 +1990,26 @@ function segmentoDaLoja(loja, estado){
    ============================================================ */
 const PERIODOS = [
   ["mes","Mês atual"],["7","Últimos 7 dias"],["15","Últimos 15 dias"],
-  ["30","Últimos 30 dias"],["60","Últimos 60 dias"],["90","Últimos 90 dias"],
-  ["anterior","Mês anterior"],["perso","Personalizado"]
+  ["30","Últimos 30 dias"],["45","Últimos 45 dias"],["60","Últimos 60 dias"],
+  ["90","Últimos 90 dias"],["perso","Personalizado"]
 ];
 function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function rangePeriodo(v){
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   if(v==="mes"){ return [new Date(hoje.getFullYear(),hoje.getMonth(),1), new Date(hoje.getFullYear(),hoje.getMonth()+1,0)]; }
-  if(v==="anterior"){ return [new Date(hoje.getFullYear(),hoje.getMonth()-1,1), new Date(hoje.getFullYear(),hoje.getMonth(),0)]; }
-  if(["7","15","30","60","90"].includes(v)){ const de=new Date(hoje); de.setDate(de.getDate()-(parseInt(v,10)-1)); return [de,hoje]; }
+  if(["7","15","30","45","60","90"].includes(v)){ const de=new Date(hoje); de.setDate(de.getDate()-(parseInt(v,10)-1)); return [de,hoje]; }
   return [null,null]; // personalizado
 }
 function preenchePeriodos(){
-  ["ft","lj","pg","hs"].forEach(pre=>{
-    const sel=$(pre+"-per"); if(!sel) return;
-    if(!sel.options.length){ sel.innerHTML = PERIODOS.map(([v,l])=>`<option value="${v}">${l}</option>`).join(""); }
-    if(!sel.value) sel.value="mes";
-    aplicaPeriodoValor(pre); // ajusta de/ate sem re-render
-  });
+  ["ft","lj","pg","hs"].forEach(pre=>garantePeriodo(pre));
+}
+function garantePeriodo(pre){
+  const sel=$(pre+"-per"); if(!sel) return;
+  if(!sel.options.length){
+    sel.innerHTML = PERIODOS.map(([v,l])=>`<option value="${v}">${l}</option>`).join("");
+    sel.value="mes";
+    aplicaPeriodoValor(pre);
+  }
 }
 function aplicaPeriodoValor(pre){
   const v=$(pre+"-per").value;
@@ -2033,8 +2042,8 @@ function preencheTime(id){
   sel.innerHTML = `<option value="">Todos os times</option>` + TIMES_LIST.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
   sel.value = atual;
 }
-// vendedor: admin ve todos; nao-admin fica travado no proprio nome
-function preencheVendedor(id, nomes){
+// vendedor: admin ve todos os cadastrados (USUARIOS col C); nao-admin fica travado no proprio nome
+function preencheVendedor(id, nomesFallback){
   const sel=$(id); if(!sel) return;
   const adm = USER && USER.role==="admin";
   if(!adm){
@@ -2044,6 +2053,9 @@ function preencheVendedor(id, nomes){
   }
   const atual=sel.value;
   sel.disabled=false;
+  // usa TODOS os usuarios cadastrados; se ainda nao carregou, cai no fallback
+  const nomes = VENDEDORES.length ? VENDEDORES.map(v=>v.nome).filter(Boolean).sort()
+                                  : (nomesFallback||[]);
   sel.innerHTML = `<option value="">Todos</option>` + nomes.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
   sel.value = atual;
 }
@@ -2150,6 +2162,7 @@ function filtrarLoja(lj){
 }
 
 function renderRel(){
+  garantePeriodo("ft");
   // opcoes dos filtros simples
   {
     const atual = $("ft-uf").value;
@@ -2502,12 +2515,13 @@ function renderListaConc(mc){
   $("lista-conc").innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;
       padding:6px 0;border-bottom:1px solid var(--bd);margin-bottom:2px">
-      <span style="font-size:10px;color:var(--tx3);letter-spacing:.06em">CONCORRENTE</span>
+      <span style="font-size:10px;color:var(--tx3);letter-spacing:.06em">CONCORRENTE <span style="color:var(--tx3);opacity:.7">(${itens.length})</span></span>
       <button onclick="ordenarConc()" style="background:none;border:none;cursor:pointer;padding:2px 4px;
         color:var(--or);font-size:10px;letter-spacing:.06em;display:flex;align-items:center;gap:4px">
         MENCOES <span style="font-size:9px">${ORD_CONC==="desc"?"▼":"▲"}</span>
       </button>
     </div>
+    <div style="max-height:340px;overflow-y:auto;padding-right:4px">
     ${itens.map(([nome,n]) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;
         border-bottom:1px solid rgba(30,42,58,.5)">
@@ -2517,7 +2531,8 @@ function renderListaConc(mc){
           <span style="font-size:11px;font-weight:700;color:var(--or);background:rgba(228,102,122,.15);
             padding:2px 9px;border-radius:4px;min-width:30px;text-align:center">${n}</span>
         </span>
-      </div>`).join("")}`;
+      </div>`).join("")}
+    </div>`;
 }
 
 function ordenarConc(){
@@ -2747,6 +2762,7 @@ $("lj-limpar").onclick = () => {
 };
 
 function renderLojas(){
+  garantePeriodo("lj");
   // periodo ja cuida de lj-de/lj-ate; garante default na 1a vez
   if(!$("lj-de").value && $("lj-per")){ aplicaPeriodoValor("lj"); }
   preencheVendedor("lj-vend", (VENDEDORES.length?VENDEDORES.map(v=>v.nome):valoresUnicos(PROGRAMACOES.map(p=>p.vendedor),"nome")));
@@ -3132,6 +3148,7 @@ function segmentoDaProg(p){
 }
 
 function renderProg(){
+  garantePeriodo("pg");
   if(!$("pg-de").value && $("pg-per")){ aplicaPeriodoValor("pg"); }
   const de=$("pg-de").value, ate=$("pg-ate").value;
   const uf=$("pg-uf").value, cid=$("pg-cidade").value, seg=$("pg-seg").value, vend=$("pg-vend").value;
