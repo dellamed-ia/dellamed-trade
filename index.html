@@ -85,6 +85,13 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 .fbar > div > select, .fbar > div > input{width:100%}
 .fbar > button{flex:0 0 auto;align-self:end}
 .fbar > label{flex:0 0 auto;align-self:end}
+/* filtros em linhas explicitas */
+.frow{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:end;margin-bottom:10px}
+.frow:last-child{margin-bottom:0}
+.frow > div{flex:1 1 170px;min-width:150px}
+.frow > div > select, .frow > div > input, .frow > div > button{width:100%}
+.factions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+.factions .esq{margin-right:auto}
 .btn{padding:11px 30px;border-radius:8px;border:none;cursor:pointer;
   font-size:13px;font-weight:700;letter-spacing:.04em;
   background:var(--azul);color:var(--marinho)}
@@ -397,40 +404,43 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 
     <!-- RELATORIO -->
     <section id="vw-rel" class="hide">
-      <div class="card fbar" style="padding:12px 16px;margin-bottom:16px">
-        <div><label class="lbl" style="font-size:10px">Período</label>
-          <select id="ft-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('ft', renderRel)"></select></div>
-        <div class="ft-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="ft-de" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div class="ft-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="ft-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="ft-vend" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Time</label><select id="ft-time" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Estado</label><select id="ft-uf" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Faixa de nota</label><select id="ft-sent" style="padding:7px 10px;font-size:13px">
-          <option value="">Todas</option><option value="alta">Alta (7-10)</option>
-          <option value="media">Média (4-6)</option><option value="baixa">Baixa (0-3)</option></select></div>
-        <div style="position:relative"><label class="lbl" style="font-size:10px">Segmento</label>
-          <button class="nav" id="ft-seg-btn" style="padding:7px 10px;font-size:13px;min-width:120px;text-align:left">Todos ▾</button>
-          <div id="ft-seg-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;margin-top:4px;
-            background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:180px;
-            max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+      <div class="card" style="padding:12px 16px;margin-bottom:16px">
+        <div class="frow">
+          <div><label class="lbl" style="font-size:10px">Período</label>
+            <select id="ft-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('ft', renderRel)"></select></div>
+          <div class="ft-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="ft-de" type="date" style="padding:7px 10px;font-size:13px"></div>
+          <div class="ft-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="ft-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
+          <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="ft-vend" style="padding:7px 10px;font-size:13px"></select></div>
+          <div><label class="lbl" style="font-size:10px">Time</label><select id="ft-time" style="padding:7px 10px;font-size:13px"></select></div>
         </div>
-        <div style="position:relative"><label class="lbl" style="font-size:10px">Loja</label>
-          <button class="nav" id="ft-loja-btn" style="padding:7px 10px;font-size:13px;min-width:160px;text-align:left">Todas ▾</button>
-          <div id="ft-loja-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;margin-top:4px;
-            background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:240px;
-            max-height:300px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)">
-            <div style="position:relative;margin-bottom:8px">
-              <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input id="ft-loja-busca" type="text" autocomplete="off" placeholder="Buscar loja..."
-                style="padding:6px 8px 6px 28px;font-size:12px">
+        <div class="frow">
+          <div><label class="lbl" style="font-size:10px">Estado</label><select id="ft-uf" style="padding:7px 10px;font-size:13px"></select></div>
+          <div><label class="lbl" style="font-size:10px">Faixa de nota</label><select id="ft-sent" style="padding:7px 10px;font-size:13px">
+            <option value="">Todas</option><option value="alta">Alta (7-10)</option>
+            <option value="media">Média (4-6)</option><option value="baixa">Baixa (0-3)</option></select></div>
+          <div style="position:relative"><label class="lbl" style="font-size:10px">Segmento</label>
+            <button class="nav" id="ft-seg-btn" style="padding:7px 10px;font-size:13px;text-align:left">Todos ▾</button>
+            <div id="ft-seg-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;margin-top:4px;
+              background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:180px;
+              max-height:240px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+          </div>
+          <div style="position:relative"><label class="lbl" style="font-size:10px">Loja</label>
+            <button class="nav" id="ft-loja-btn" style="padding:7px 10px;font-size:13px;text-align:left">Todas ▾</button>
+            <div id="ft-loja-drop" class="hide" style="position:absolute;z-index:30;top:100%;left:0;margin-top:4px;
+              background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:240px;
+              max-height:300px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)">
+              <div style="position:relative;margin-bottom:8px">
+                <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="ft-loja-busca" type="text" autocomplete="off" placeholder="Buscar loja..." style="padding:6px 8px 6px 28px;font-size:12px">
+              </div>
+              <div id="ft-loja-lista"></div>
             </div>
-            <div id="ft-loja-lista"></div>
           </div>
         </div>
-        <button class="nav" id="ft-limpar" title="Limpar filtros" style="padding:7px 10px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <div style="margin-left:auto;display:flex;gap:8px">
+        <div class="factions">
+          <button class="nav" id="ft-limpar" title="Limpar filtros" style="padding:7px 10px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
           <button class="nav" id="ft-atualizar" title="Atualizar" style="border-color:rgba(139,184,232,.4);color:var(--cy);padding:7px 10px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
           </button>
@@ -484,23 +494,29 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 
     <!-- LOJAS NAO VISITADAS -->
     <section id="vw-lojas" class="hide">
-      <div class="card fbar" style="padding:12px 16px;margin-bottom:16px">
-        <div><label class="lbl" style="font-size:10px">Período</label>
-          <select id="lj-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('lj', renderLojas)"></select></div>
-        <div class="lj-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="lj-de" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div class="lj-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="lj-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div><label class="lbl" style="font-size:10px">Estado</label><select id="lj-uf" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Cidade</label><select id="lj-cidade" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Segmento</label><select id="lj-seg" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Time</label><select id="lj-time" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="lj-vend" style="padding:7px 10px;font-size:13px"></select></div>
-        <button class="nav" id="lj-limpar" title="Limpar" style="padding:7px 10px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <button class="nav" id="lj-excel" title="Exportar Excel" style="margin-left:auto;border-color:rgba(59,178,115,.5);
-          background:rgba(59,178,115,.08);color:var(--gr);padding:7px 10px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </button>
+      <div class="card" style="padding:12px 16px;margin-bottom:16px">
+        <div class="frow">
+          <div><label class="lbl" style="font-size:10px">Período</label>
+            <select id="lj-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('lj', renderLojas)"></select></div>
+          <div class="lj-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="lj-de" type="date" style="padding:7px 10px;font-size:13px"></div>
+          <div class="lj-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="lj-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
+          <div><label class="lbl" style="font-size:10px">Estado</label><select id="lj-uf" style="padding:7px 10px;font-size:13px"></select></div>
+          <div><label class="lbl" style="font-size:10px">Cidade</label><select id="lj-cidade" style="padding:7px 10px;font-size:13px"></select></div>
+        </div>
+        <div class="frow">
+          <div><label class="lbl" style="font-size:10px">Segmento</label><select id="lj-seg" style="padding:7px 10px;font-size:13px"></select></div>
+          <div><label class="lbl" style="font-size:10px">Time</label><select id="lj-time" style="padding:7px 10px;font-size:13px"></select></div>
+          <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="lj-vend" style="padding:7px 10px;font-size:13px"></select></div>
+        </div>
+        <div class="factions">
+          <button class="nav" id="lj-limpar" title="Limpar" style="padding:7px 10px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+          <button class="nav" id="lj-excel" title="Exportar Excel" style="border-color:rgba(59,178,115,.5);
+            background:rgba(59,178,115,.08);color:var(--gr);padding:7px 10px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+        </div>
       </div>
       <div id="lj-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px"></div>
       <div style="position:relative;margin-bottom:14px">
@@ -512,28 +528,34 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 
     <!-- PROGRAMACAO -->
     <section id="vw-prog" class="hide">
-      <div class="card fbar" style="padding:12px 16px;margin-bottom:16px">
-        <div><label class="lbl" style="font-size:10px">Período</label>
-          <select id="pg-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('pg', renderProg)"></select></div>
-        <div class="pg-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="pg-de" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div class="pg-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="pg-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
-        <div><label class="lbl" style="font-size:10px">Estado</label><select id="pg-uf" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Cidade</label><select id="pg-cidade" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Segmento</label><select id="pg-seg" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Time</label><select id="pg-time" style="padding:7px 10px;font-size:13px"></select></div>
-        <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="pg-vend" style="padding:7px 10px;font-size:13px"></select></div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx2);cursor:pointer;padding-bottom:6px">
-          <input type="checkbox" id="pg-soanota" style="width:15px;height:15px;padding:0;accent-color:var(--rd);cursor:pointer">
-          <span style="color:var(--rd);font-weight:700">!</span> so com anotacao
-        </label>
-        <button class="btn" id="pg-pesquisar" style="padding:7px 16px;font-size:12px">PESQUISAR</button>
-        <button class="nav" id="pg-limpar" title="Limpar" style="padding:7px 10px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <button class="nav" id="pg-excel" title="Exportar Excel" style="margin-left:auto;border-color:rgba(59,178,115,.5);
-          background:rgba(59,178,115,.08);color:var(--gr);padding:7px 10px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </button>
+      <div class="card" style="padding:12px 16px;margin-bottom:16px">
+        <div class="frow">
+          <div><label class="lbl" style="font-size:10px">Período</label>
+            <select id="pg-per" style="padding:7px 10px;font-size:13px" onchange="aplicaPeriodo('pg', renderProg)"></select></div>
+          <div class="pg-perso" style="display:none"><label class="lbl" style="font-size:10px">De</label><input id="pg-de" type="date" style="padding:7px 10px;font-size:13px"></div>
+          <div class="pg-perso" style="display:none"><label class="lbl" style="font-size:10px">Até</label><input id="pg-ate" type="date" style="padding:7px 10px;font-size:13px"></div>
+          <div><label class="lbl" style="font-size:10px">Estado</label><select id="pg-uf" style="padding:7px 10px;font-size:13px"></select></div>
+          <div><label class="lbl" style="font-size:10px">Cidade</label><select id="pg-cidade" style="padding:7px 10px;font-size:13px"></select></div>
+        </div>
+        <div class="frow">
+          <div><label class="lbl" style="font-size:10px">Segmento</label><select id="pg-seg" style="padding:7px 10px;font-size:13px"></select></div>
+          <div><label class="lbl" style="font-size:10px">Time</label><select id="pg-time" style="padding:7px 10px;font-size:13px"></select></div>
+          <div><label class="lbl" style="font-size:10px">Vendedor / Key Account / Representante</label><select id="pg-vend" style="padding:7px 10px;font-size:13px"></select></div>
+        </div>
+        <div class="factions">
+          <label class="esq" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx2);cursor:pointer">
+            <input type="checkbox" id="pg-soanota" style="width:15px;height:15px;padding:0;accent-color:var(--rd);cursor:pointer">
+            <span style="color:var(--rd);font-weight:700">!</span> só com anotação
+          </label>
+          <button class="btn" id="pg-pesquisar" style="padding:7px 16px;font-size:12px">PESQUISAR</button>
+          <button class="nav" id="pg-limpar" title="Limpar" style="padding:7px 10px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+          <button class="nav" id="pg-excel" title="Exportar Excel" style="border-color:rgba(59,178,115,.5);
+            background:rgba(59,178,115,.08);color:var(--gr);padding:7px 10px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+        </div>
       </div>
       <div id="pg-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:16px"></div>
       <div id="pg-lista"></div>
@@ -1701,9 +1723,19 @@ function renderPendentes(){
 }
 
 async function reanalisar(id){
-  load("analisando...");
-  try{ const r = await api("analisar", {id}); unload(); if(!r.ok) alert(r.erro); await recarregar(); }
-  catch(e){ unload(); alert("Sem conexao."); }
+  load("analisando com IA... pode levar até 1 minuto");
+  try{
+    const r = await api("analisar", {id}, 180000);   // IA e lenta: ate 3 min
+    unload();
+    if(!r || !r.ok){
+      alert("Não foi possível analisar agora.\n" + ((r && r.erro) ? r.erro : "O servidor demorou a responder.") + "\nTente novamente em instantes.");
+      return;
+    }
+    await recarregar();
+  }catch(e){
+    unload();
+    alert("A análise demorou mais que o esperado e foi interrompida.\nMuitas vezes ela conclui no servidor mesmo assim — atualize o Histórico em alguns segundos.\nSe continuar, tente de novo.");
+  }
 }
 
 /* ---------- HISTORICO ---------- */
