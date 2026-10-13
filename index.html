@@ -29,7 +29,35 @@
 </head>
 <body>
 <!-- Esta pagina so abre o sistema. Nao ha dados aqui: o acesso exige login com senha. -->
-<iframe src="https://script.google.com/macros/s/AKfycbxqvMsqU7XoGIFN3k8fPRc0gx4DZ4O6zmYoI85HWtKcGLE-YdX-XVycOvKTEb9_bJeEOw/exec"
+<iframe id="app" src="https://script.google.com/macros/s/AKfycbxqvMsqU7XoGIFN3k8fPRc0gx4DZ4O6zmYoI85HWtKcGLE-YdX-XVycOvKTEb9_bJeEOw/exec"
         title="Trade Intelligence · Dellamed" allow="clipboard-write; geolocation"></iframe>
+
+<script>
+/* Recupera a tela em branco depois de sair do app (abrir o mapa, outro app, trocar de aba).
+   O sistema manda um "sinal de vida" a cada 2s. Se o sinal ja chegou alguma vez e some
+   quando voltamos para a tela, o quadro morreu: recarregamos so ele.
+   Se o sinal nunca chegou (versao antiga do sistema), nada e recarregado. */
+(function(){
+  var ultimoSinal = 0, jaRecebeu = false, conferindo = null;
+  window.addEventListener("message", function(e){
+    if(e && e.data && e.data.app === "trade-dellamed"){ ultimoSinal = Date.now(); jaRecebeu = true; }
+  });
+  function conferir(){
+    if(!jaRecebeu || document.hidden) return;
+    clearTimeout(conferindo);
+    conferindo = setTimeout(function(){
+      if(document.hidden) return;
+      if(Date.now() - ultimoSinal > 4500){          // parou de responder: recarrega o quadro
+        var f = document.getElementById("app");
+        if(f) f.src = f.src;
+        ultimoSinal = Date.now();
+      }
+    }, 3500);
+  }
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) conferir(); });
+  window.addEventListener("focus", conferir);
+  window.addEventListener("pageshow", conferir);
+})();
+</script>
 </body>
 </html>
