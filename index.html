@@ -39,8 +39,25 @@
    Se o sinal nunca chegou (versao antiga do sistema), nada e recarregado. */
 (function(){
   var ultimoSinal = 0, jaRecebeu = false, conferindo = null;
+
+  /* O tema (claro/escuro) e escolhido dentro do sistema. Esta pagina so pinta o
+     fundo da mesma cor, para nao aparecer uma borda azul-escura no tema claro.
+     A cor fica guardada aqui tambem, para ja abrir certo da proxima vez. */
+  function pintarFundo(cor){
+    if(!cor) return;
+    document.documentElement.style.background = cor;
+    document.body.style.background = cor;
+    var f = document.getElementById("app"); if(f) f.style.background = cor;
+    var m = document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute("content", cor);
+    try{ localStorage.setItem("trade_fundo", cor); }catch(e){}
+  }
+  try{ pintarFundo(localStorage.getItem("trade_fundo")); }catch(e){}
+
   window.addEventListener("message", function(e){
-    if(e && e.data && e.data.app === "trade-dellamed"){ ultimoSinal = Date.now(); jaRecebeu = true; }
+    if(e && e.data && e.data.app === "trade-dellamed"){
+      ultimoSinal = Date.now(); jaRecebeu = true;
+      if(e.data.fundo) pintarFundo(e.data.fundo);
+    }
   });
   function conferir(){
     if(!jaRecebeu || document.hidden) return;
