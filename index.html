@@ -53,11 +53,40 @@
   }
   try{ pintarFundo(localStorage.getItem("trade_fundo")); }catch(e){}
 
+  /* ---------- GUARDA DO APARELHO ----------
+     O sistema roda dentro desta pagina. O navegador do iPhone (e o Chrome com
+     cookies de terceiros bloqueados) nao deixa quem roda dentro de outra pagina
+     guardar nada no aparelho - por isso o "lembrar meu e-mail e senha" nao
+     funcionava. Esta pagina e a dona do endereco e nao sofre esse bloqueio,
+     entao ela guarda em nome do sistema.
+     So aceita recado vindo do Google (onde o sistema roda) e so mexe nas
+     chaves que comecam com "trade_". O dado guardado e o mesmo que o sistema
+     guardaria sozinho, neste aparelho, e nunca sai daqui. */
+  function origemConfiavel(o){
+    return o === location.origin ||
+           /^https:\/\/([a-z0-9-]+\.)*googleusercontent\.com$/.test(o) ||
+           o === "https://script.google.com";
+  }
+  function chaveValida(k){ return typeof k === "string" && k.indexOf("trade_") === 0 && k.length < 64; }
+
   window.addEventListener("message", function(e){
-    if(e && e.data && e.data.app === "trade-dellamed"){
-      ultimoSinal = Date.now(); jaRecebeu = true;
-      if(e.data.fundo) pintarFundo(e.data.fundo);
-    }
+    var d = e && e.data;
+    if(!d || d.app !== "trade-dellamed") return;
+    ultimoSinal = Date.now(); jaRecebeu = true;
+    if(d.fundo) pintarFundo(d.fundo);
+
+    if(!origemConfiavel(e.origin)) return;
+    try{
+      if(d.guardar && chaveValida(d.guardar.k) && typeof d.guardar.v === "string" && d.guardar.v.length < 4000){
+        localStorage.setItem(d.guardar.k, d.guardar.v);
+      }
+      if(chaveValida(d.apagar)) localStorage.removeItem(d.apagar);
+      if(Array.isArray(d.pedir) && e.source){
+        var out = {};
+        d.pedir.slice(0, 10).forEach(function(k){ if(chaveValida(k)) out[k] = localStorage.getItem(k); });
+        e.source.postMessage({ app:"trade-dellamed-site", dados: out }, e.origin);
+      }
+    }catch(err){}
   });
   function conferir(){
     if(!jaRecebeu || document.hidden) return;
